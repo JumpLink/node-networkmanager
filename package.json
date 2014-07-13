@@ -9,6 +9,7 @@
   "author": "Pascal Garber <pascal@jumplink.eu> (http://jumplink.eu/)",
   "license": "MIT",
   "dependencies": {
+    "async": "^0.9.0",
     "dbus": "^0.2.9",
     "debug": "^1.0.3",
     "netmask": "^1.0.4"

@@ -7,6 +7,7 @@
 
 
 var util = require('util');
+var async = require('async');
 var Netmask = require('netmask').Netmask
 var _debugEvent = require('debug')('event');
 var debugEvent = function (name, arg1, arg2, arg3, arg4, arg5) {
@@ -77,54 +78,6 @@ waitForService = function (findServiceName, timeoutDelay, intervalDelay, callbac
     }
   });
 }
-
-// var watchProperties = function (valueToSet, serviceName, objectPath, callback) {
-//   bus.getInterface(serviceName, objectPath, 'org.freedesktop.DBus.Properties', function(err, iface) {
-//     if(err) {
-//       callback(err);
-//     } else {
-//       iface.on('PropertiesChanged', function(interfaceName, value) {
-//         var valueKey = Object.keys(value)[0];
-//         var signalName = valueKey+"Changed";
-//         debugEvent(interfaceName+"."+signalName, value[valueKey]);
-//         if (typeof valueKey == 'string' || valueKey instanceof String) {
-//           switch(interfaceName) {
-//             case 'org.mpris.MediaPlayer2':
-//               valueToSet.emit(signalName, value[valueKey], valueToSet[valueKey]);
-//               valueToSet[valueKey] = value[valueKey];
-//             break;
-//             case 'org.mpris.MediaPlayer2.Player':
-//               valueToSet.Player.emit(signalName, value[valueKey], valueToSet.Player[valueKey]);
-//               valueToSet.Player[valueKey] = value[valueKey];
-//             break;
-//             case 'org.mpris.MediaPlayer2.TrackList':
-//               valueToSet.TrackList.emit(signalName, value[valueKey], valueToSet.TrackList[valueKey]);
-//               valueToSet.TrackList[valueKey] = value[valueKey];
-//             break;
-//             case 'org.mpris.MediaPlayer2.Playlists':
-//               valueToSet.Playlists.emit(signalName, value[valueKey], valueToSet.Playlists[valueKey]);
-//               valueToSet.Playlists[valueKey] = value[valueKey];
-//             break;
-//           }
-//         } else { // WORKAROUND if value is not sent, e.g. http://specifications.freedesktop.org/mpris-spec/latest/Track_List_Interface.html#Property:Tracks
-//           switch(interfaceName) {
-//             case 'org.mpris.MediaPlayer2':
-//             break;
-//             case 'org.mpris.MediaPlayer2.Player':
-//             break;
-//             case 'org.mpris.MediaPlayer2.TrackList':
-//               valueToSet.TrackList.emit("TracksChanged");
-//             break;
-//             case 'org.mpris.MediaPlayer2.Playlists':
-//             break;
-//           }
-//         }
-
-//       });
-//       callback(null);
-//     }
-//   });
-// }
 
 var integrateMethods = function (valueToSet, iface, methodKeys) {
   methodKeys.forEach(function(methodKey) {
@@ -228,10 +181,6 @@ var arrayOfBytesToString = function (ArrayOfBytes) {
   return SsidString;
 };
 
-nm.SsidToString = function (ssid) {
-  return arrayOfBytesToString(ssid);
-};
-
 var numToDot = function (num) {
   var d = num%256;
   for (var i = 3; i > 0; i--) { 
@@ -248,7 +197,7 @@ var numToDot = function (num) {
 // See
 //   https://developer.gnome.org/NetworkManager/0.9/spec.html#org.freedesktop.NetworkManager.IP4Config
 //   https://github.com/rs/node-netmask
-nm.AddressTupleToIPBlock = function (AddressTuple) {
+var AddressTupleToIPBlock = function (AddressTuple) {
   
   var ip = numToDot(AddressTuple[0]);
   var gateway = numToDot(AddressTuple[2]);
@@ -267,53 +216,183 @@ nm.connect = function (callback) {
   nm.NewNetworkManager = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager';}
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
+
+      // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (NetworkManager.GetActiveConnections) {
+        var _GetActiveConnections = NetworkManager.GetActiveConnections;
+        NetworkManager.GetActiveConnections = function (callback) {
+          _GetActiveConnections(function (error, ActiveConnectionPaths) {
+            async.map(ActiveConnectionPaths,
+              function iterator(ActiveConnectionPath, callback) {
+                nm.NewActiveConnection(ActiveConnectionPath, callback);
+              }, callback
+            );
+          });
+        }
+      }
+
+      callback(error, NetworkManager);
+    });
   }
 
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+
+      // Overwrite AccessPoint.GetSsid function to get Wireless SSID as strings instead of byte sequences.
+      if (AccessPoint.GetSsid) {
+        var _GetSsid = AccessPoint.GetSsid;
+        AccessPoint.GetSsid = function (callback) {
+          _GetSsid(function(error, Ssid) {
+            var SsidString = null;
+            if(!error) {
+              SsidString = arrayOfBytesToString(Ssid);
+            }
+            callback(error, SsidString);
+          });
+        }
+      }
+
+      callback(error, AccessPoint);
+    });
   }
 
   nm.NewDevice = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+
+      // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (Device.GetIp4Config) {
+        var _GetIp4Config = Device.GetIp4Config;
+        Device.GetIp4Config = function (callback) {
+          _GetIp4Config(function (error, Ip4ConfigPath) {
+            nm.NewIP4Config(Ip4ConfigPath, callback);
+          });
+        }
+      }
+      if (Device.GetIp6Config) {
+        var _GetIp6Config = Device.GetIp6Config;
+        Device.GetIp6Config = function (callback) {
+          _GetIp6Config(function (error, Ip6ConfigPath) {
+            nm.NewIP6Config(Ip6ConfigPath, callback);
+          });
+        }
+      }
+
+      callback(error, Device);
+    });
   }
 
   nm.NewIP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP4Config';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
+
+      /*
+       * Overwrite IP4Config.GetAddresses function to get IP addresses as strings of the form 1.2.3.4 instead of network byte ordered integers.
+       */
+      if (IP4Config.GetAddresses) {
+        var _GetAddresses = IP4Config.GetAddresses;
+        IP4Config.GetAddresses = function (callback) {
+          _GetAddresses(function (error, Addresses) {
+            var result = [];
+            if(!error) {
+              for (var i = 0; i < Addresses.length; i++) {
+                var AddressTuple = Addresses[i];
+                var IPv4 = AddressTupleToIPBlock(AddressTuple);
+                result.push(IPv4);
+              };
+            }
+            callback(error, result);
+          });
+        }
+      }
+      callback(error, IP4Config);
+    });
   }
 
   nm.NewIP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
+
+      callback(error, IP6Config);
+    });
   }
 
   nm.NewDHCP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP4Config';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
+
+      callback(error, DHCP4Config);
+    });
   }
 
   nm.NewDHCP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP6Config';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
+
+      callback(error, DHCP6Config);
+    });
   }
 
   nm.NewSettings = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager/Settings';}
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, function (error, Settings) {
+
+      callback(error, Settings);
+    });
   }
 
   nm.NewSettingsConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
+
+      callback(error, SettingsConnection);
+    });
   }
 
   nm.NewActiveConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Connection.Active';
-    loadInterface(result = {}, nm.serviceName, objectPath, interfaceName, callback);
+    var ActiveConnection = {};
+    loadInterface(ActiveConnection, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
+
+      // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (ActiveConnection.GetSpecificObject) {
+        var _GetSpecificObject = ActiveConnection.GetSpecificObject;
+        ActiveConnection.GetSpecificObject = function (callback) {
+          _GetSpecificObject(function (error, AccessPointPath) {
+            nm.NewAccessPoint(AccessPointPath, callback);
+          });
+        }
+        // Alias
+        ActiveConnection.GetAccessPoint = ActiveConnection.GetSpecificObject
+      }
+
+      if (ActiveConnection.GetDevices) {
+        var _GetDevices = ActiveConnection.GetDevices;
+        ActiveConnection.GetDevices = function (callback) {
+          _GetDevices(function (error, DevicesPaths) {
+            async.map(DevicesPaths,
+              function iterator(DevicesPath, callback) {
+                nm.NewDevice(DevicesPath, callback);
+              }, callback
+            );
+          });
+        }
+      }
+
+      if (ActiveConnection.GetConnection) {
+        var _GetConnection = ActiveConnection.GetConnection;
+        ActiveConnection.GetConnection = function (callback) {
+          _GetConnection(function (error, SettingsConnectionPath) {
+            nm.NewSettingsConnection(SettingsConnectionPath, callback);
+          });
+        }
+      }
+
+      callback(error, ActiveConnection);
+    });
   }
 
 
@@ -322,7 +401,10 @@ nm.connect = function (callback) {
       console.error (error);
     } else {
       debug("NetworkManager DBus found! :)");
-      callback(error, nm);
+      nm.NewNetworkManager(null, function(error, NetworkManager) {
+        nm.NetworkManager = NetworkManager;
+        callback(error, nm);
+      });
     }
   });
 }
