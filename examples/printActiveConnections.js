@@ -1,6 +1,4 @@
-// http://cheesehead-techblog.blogspot.de/2012/09/dbus-tutorial-fun-with-network-manager.html
-
-var nm = require('../index.js');
+var networkmanager = require('../index.js');
 var util = require('util');
 
 var inspect = function(object) {
@@ -24,7 +22,18 @@ var getIp4ConfigInfo = function (IP4Config) {
 }
 
 var getIp6ConfigInfo = function (IP6Config) {
-  console.log(IP6Config);
+  IP6Config.GetRoutes(function(error, Routes) {
+    inspect(Routes);
+  });
+  IP6Config.GetDomains(function(error, Domains) {
+    inspect(Domains);
+  });
+  IP6Config.GetNameservers(function(error, Nameservers) {
+    inspect(Nameservers);
+  });
+  IP6Config.GetAddresses(function(error, Addresses) {
+    inspect(Addresses);
+  });
 }
 
 var getDeviceInfo = function (Device) {
@@ -33,7 +42,7 @@ var getDeviceInfo = function (Device) {
   });
 
   Device.GetIp6Config(function(error, Ip6Config) {
-    getIp6ConfigInfo(Ip6Config);
+    if(!error && Ip6Config != null) getIp6ConfigInfo(Ip6Config);
   });
 
   Device.GetAutoconnect(function(error, Autoconnect) {
@@ -95,12 +104,15 @@ var getActiveConnectionInfo = function (ActiveConnection) {
   });
 }
 
-nm.connect(function (error, NetworkManager) {
-  NetworkManager.NetworkManager.GetVersion(function(error, Version) {
+networkmanager.connect(function (error, networkmanager) {
+  networkmanager.NetworkManager.GetVersion(function(error, Version) {
     console.log("NetworkManager Version: "+Version);
   });
+  networkmanager.NetworkManager.GetState(function(error, State) {
+    inspect(State);
+  });
   // get all active connections
-  NetworkManager.NetworkManager.GetActiveConnections(function(error, ActiveConnections) {
+  networkmanager.NetworkManager.GetActiveConnections(function(error, ActiveConnections) {
     console.log("Count of active connections: "+ActiveConnections.length);
     for (var i = 0; i < ActiveConnections.length; i++) {
       getActiveConnectionInfo(ActiveConnections[i]);

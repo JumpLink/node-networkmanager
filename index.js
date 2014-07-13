@@ -33,7 +33,6 @@ var DBus = require('dbus');
 var dbus = new DBus();
 var events = require('events');
 
-//var nm = new events.EventEmitter();
 var nm = {};
 var bus;
 var TIMEOUTDELAY = 30000;
@@ -137,7 +136,7 @@ var integrateSignals = function (valueToSet, iface, signalKeys) {
   signalKeys.forEach(function(signalKey) {
     iface.on(signalKey, function(arg1, arg2, arg3, arg4, arg5) {
       debugEvent(signalKey, arg1, arg2, arg3, arg4, arg5);
-      //valueToSet.emit(signalKey, arg1, arg2, arg3, arg4, arg5);
+      valueToSet.emit(signalKey, arg1, arg2, arg3, arg4, arg5);
     });
   });
 }
@@ -216,7 +215,7 @@ nm.connect = function (callback) {
   nm.NewNetworkManager = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager';}
-    loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
+    loadInterface(NetworkManager = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (NetworkManager.GetActiveConnections) {
@@ -232,13 +231,60 @@ nm.connect = function (callback) {
         }
       }
 
+      if (NetworkManager.GetState) {
+        var _GetState = NetworkManager.GetState;
+        NetworkManager.GetState = function (callback) {
+          _GetState(function (error, StateCode) {
+            if(error) callback(error);
+            else {
+              var StateObject = {
+                code: StateCode,
+                name: 'unknown',
+                description: 'Networking state is unknown.'
+              };
+              switch(StateCode) {
+                case 10:
+                  StateObject.name = 'asleep';
+                  StateObject.description = 'Networking is inactive and all devices are disabled.';
+                break;
+                case 20:
+                  StateObject.name = 'disconnected';
+                  StateObject.description = 'There is no active network connection.';
+                break;
+                case 30:
+                  StateObject.name = 'disconnecting';
+                  StateObject.description = 'Network connections are being cleaned up.';
+                break;
+                case 40:
+                  StateObject.name = 'connecting';
+                  StateObject.description = 'A network device is connecting to a network and there is no other available network connection.';
+                break;
+                case 50:
+                  StateObject.name = 'connected_local';
+                  StateObject.description = 'A network device is connected, but there is only link-local connectivity.';
+                break;
+                case 60:
+                  StateObject.name = 'connected_site';
+                  StateObject.description = 'A network device is connected, but there is only site-local connectivity.';
+                break;
+                case 70:
+                  StateObject.name = 'connected_global';
+                  StateObject.description = 'A network device is connected, with global network connectivity.';
+                break;
+              }
+              callback(null, StateObject);
+            }
+          });
+        }
+      }
+
       callback(error, NetworkManager);
     });
   }
 
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
-    loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+    loadInterface(AccessPoint = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
 
       // Overwrite AccessPoint.GetSsid function to get Wireless SSID as strings instead of byte sequences.
       if (AccessPoint.GetSsid) {
@@ -260,7 +306,7 @@ nm.connect = function (callback) {
 
   nm.NewDevice = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, Device) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (Device.GetIp4Config) {
@@ -275,7 +321,8 @@ nm.connect = function (callback) {
         var _GetIp6Config = Device.GetIp6Config;
         Device.GetIp6Config = function (callback) {
           _GetIp6Config(function (error, Ip6ConfigPath) {
-            nm.NewIP6Config(Ip6ConfigPath, callback);
+            if(Ip6ConfigPath == "/") callback(null, null)
+            else nm.NewIP6Config(Ip6ConfigPath, callback);
           });
         }
       }
@@ -286,7 +333,7 @@ nm.connect = function (callback) {
 
   nm.NewIP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP4Config';
-    loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
+    loadInterface(IP4Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
 
       /*
        * Overwrite IP4Config.GetAddresses function to get IP addresses as strings of the form 1.2.3.4 instead of network byte ordered integers.
@@ -313,7 +360,7 @@ nm.connect = function (callback) {
 
   nm.NewIP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
-    loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
+    loadInterface(IP6Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
 
       callback(error, IP6Config);
     });
@@ -321,7 +368,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP4Config';
-    loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
+    loadInterface(DHCP4Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
 
       callback(error, DHCP4Config);
     });
@@ -329,7 +376,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP6Config';
-    loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
+    loadInterface(DHCP6Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
 
       callback(error, DHCP6Config);
     });
@@ -338,7 +385,7 @@ nm.connect = function (callback) {
   nm.NewSettings = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager/Settings';}
-    loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, function (error, Settings) {
+    loadInterface(Settings = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, Settings) {
 
       callback(error, Settings);
     });
@@ -346,7 +393,7 @@ nm.connect = function (callback) {
 
   nm.NewSettingsConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
-    loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
+    loadInterface(SettingsConnection = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
 
       callback(error, SettingsConnection);
     });
@@ -354,7 +401,7 @@ nm.connect = function (callback) {
 
   nm.NewActiveConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Connection.Active';
-    var ActiveConnection = {};
+    var ActiveConnection = new events.EventEmitter();
     loadInterface(ActiveConnection, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
