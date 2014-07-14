@@ -83,11 +83,10 @@ waitForService = function (findServiceName, timeoutDelay, intervalDelay, callbac
 var integrateMethods = function (valueToSet, iface, methodKeys) {
   methodKeys.forEach(function(methodKey) {
     valueToSet[methodKey] =  function () {
-      // var arguments = Array.prototype.slice.call(arguments); ?
+      var arguments = Array.prototype.slice.call(arguments);
       iface[methodKey]['timeout'] = TIMEOUTDELAY;
       if(arguments.length >=0) {
-        callback = arguments[arguments.length-1];
-        iface[methodKey]['finish'] = callback;
+        iface[methodKey]['finish'] = arguments[arguments.length-1]; // last argument is callback
       }
       debug("Call method "+methodKey+" with arguments: ");
       debug(arguments);
@@ -95,26 +94,7 @@ var integrateMethods = function (valueToSet, iface, methodKeys) {
       if(iface.object.method[methodKey].in.length + 1 != arguments.length) {
         warn("Wrong count of arguments! Your count of arguments is "+arguments.length+", but the count should be "+iface.object.method[methodKey].in.length+1);
       }
-      switch(arguments.length) {
-        case 0:
-          iface[methodKey]();
-        break;
-        case 1:
-          iface[methodKey](callback);
-        break;
-        case 2:
-          iface[methodKey](arguments[0], callback);
-        break;
-        case 3:
-          iface[methodKey](arguments[0], arguments[1], callback);
-        break;
-        case 4:
-          iface[methodKey](arguments[0], arguments[1], arguments[2], callback);
-        break;
-        case 5:
-          iface[methodKey](arguments[0], arguments[1], arguments[2], arguments[3], callback);
-        break;
-      }
+      iface[methodKey].apply(iface, arguments); // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/apply
     }
   });
 }
@@ -135,14 +115,20 @@ var integrateProperties = function (valueToSet, iface, propertyKeys) {
   });
 }
 
-var emitPropertyChanged = function (valueToSet, signalName, interfaceName, splitted, valueKey, newValue, oldValue )  {
-  var newState;
-  if(splitted)
-    debugEvent(signalName+" (PropertyChanged)", interfaceName, newValue, oldValue);
-  else
-    debugEvent(signalName, interfaceName, newValue, oldValue);
-  valueToSet.emit(signalName, newValue, oldValue); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
-  valueToSet[valueKey] = newValue; // save current signal value for next time to know the old value
+var emitSignal = function (valueToSet, signalName, interfaceName, splitted, saveOldValue, valueKey, newValue, oldValue, otherValues)  {
+  var debugSignalName = signalName; 
+  if(splitted) {
+    debugSignalName += " (PropertyChanged)";
+  }
+  var emitParameters = [signalName, newValue, oldValue];
+  if(otherValues && otherValues.length > 0) {
+    emitParameters.push.apply(emitParameters, otherValues); // https://stackoverflow.com/questions/13555652/dynamic-method-parameters
+  }
+  debugEvent(debugSignalName, interfaceName, newValue, oldValue, otherValues);
+  valueToSet.emit.apply(valueToSet, emitParameters); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest, for apply see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/apply
+  if(saveOldValue) {
+    valueToSet[valueKey] = newValue; // save current signal value for next time to know the old value
+  }
 }
 
 var integrateSignals = function (valueToSet, iface, signalKeys) {
@@ -151,25 +137,36 @@ var integrateSignals = function (valueToSet, iface, signalKeys) {
     var emitter = new events.EventEmitter();
     valueToSet = extend(valueToSet, emitter);
     signalKeys.forEach(function(signalKey) {
-      iface.on(signalKey, function(arg1, arg2, arg3, arg4, arg5) {
-        //debugEvent(signalKey, iface.interfaceName, arg1, arg2, arg3, arg4, arg5);
+      iface.on(signalKey, function() {
+
+        var args = Array.prototype.slice.call(arguments);
+        var signalName = null;
+        var splitted = false;
+        var saveOldValue = true;
+        var valueKey = null
+        var newValue = null;
+        var oldValue = null;
+        var otherValues = null;
+
         switch(signalKey) {
           // split each property in the PropertiesChanged event to to a custom event 
           case 'PropertiesChanged':
-            var splitedSignalKeys = Object.keys(arg1);
+            var splitedSignalKeys = Object.keys(args[0]);
             splitedSignalKeys.forEach(function(signalKey) {
 
-              var signalName = signalKey+"Changed";
-              var splitted = true;
-              var valueKey = signalKey;
-              var newValue = arg1[signalKey];
-              var oldValue = valueToSet[signalKey];
+              signalName = signalKey+"Changed";
+              splitted = true;
+              saveOldValue = true;
+              valueKey = signalKey;
+              newValue = args[0][signalKey];
+              oldValue = valueToSet[signalKey];
+              otherValues = null;
 
               switch(signalKey) {
                 case 'State':
                   switch(iface.interfaceName) {
                     case 'org.freedesktop.NetworkManager':
-                      if (newValue) newValue = enums['NM_STATE'](newValue);
+                      newValue = enums['NM_STATE'](newValue);
                     break;
                     default:
                     break;
@@ -178,42 +175,41 @@ var integrateSignals = function (valueToSet, iface, signalKeys) {
                 default:
                 break;
               }
-              emitPropertyChanged(valueToSet, signalName, iface.interfaceName, splitted, valueKey, newValue, oldValue);
             });
           break;
           case 'StateChanged':
             switch(iface.interfaceName) {
               case 'org.freedesktop.NetworkManager.Device':
-                // In this case the new value does not need to be stored
-                var signalName = signalKey;
-                var valueKey = 'State';
-                var newState, oldState, reason;
-                if (arg1) newState = enums['NM_DEVICE_STATE'](arg1);
-                if (arg2) oldState = enums['NM_DEVICE_STATE'](arg2);
-                if (arg3) reason = enums['NM_DEVICE_STATE_REASON'](arg3);
-                debugEvent(signalName, iface.interfaceName, newState, oldState, reason);
-                valueToSet.emit(signalName, newState, oldState, reason); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the reason
+                signalName = signalKey;
+                valueKey = signalName.replace('Changed','');
+                splitted = false;
+                saveOldValue = false; // In this case the new value does not need to be stored because we get the old value from the officell implementation
+                newValue = enums['NM_DEVICE_STATE'](args[0]);
+                oldValue = enums['NM_DEVICE_STATE'](args[1]);
+                otherValues = [enums['NM_DEVICE_STATE_REASON'](args[2])];
               break;
               case 'org.freedesktop.NetworkManager':
               default:
-                var signalName = signalKey;
-                var valueKey = 'State';
-                var newState;
-                if (arg1) newState = enums['NM_STATE'](arg1);
-                debugEvent(signalName, iface.interfaceName, newState, valueToSet[valueKey]);
-                valueToSet.emit(signalName, newState, valueToSet[valueKey]); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
-                valueToSet['State'] = newState; // save current signal value for next time to know the old value
+                signalName = signalKey;
+                valueKey = signalName.replace('Changed','');
+                splitted = false;
+                saveOldValue = true;
+                newValue = enums['NM_STATE'](args[0]);
+                oldValue = valueToSet[valueKey];
+                otherValues = null;
               break;
             }
           break;
           default:
-            var signalName = signalKey;
-            var valueKey = signalKey;
-            debugEvent(signalName, iface.interfaceName, arg1, valueToSet[valueKey], arg2, arg3, arg4, arg5);
-            valueToSet.emit(signalName, arg1, valueToSet[valueKey], arg2, arg3, arg4, arg5); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
-            valueToSet[valueKey] = arg1; // save current signal value for next time to know the old value
-          break;
+            signalName = signalKey;
+            valueKey = signalName.replace('Changed','');
+            splitted = false;
+            saveOldValue = true;
+            newValue = args[0];
+            oldValue = valueToSet[valueKey];
+            otherValues = null;            
         }
+        emitSignal(valueToSet, signalName, iface.interfaceName, splitted, saveOldValue, valueKey, newValue, oldValue, otherValues);
       });
     });
   }
@@ -226,7 +222,7 @@ var loadInterface = function (valueToSet, serviceName, objectPath, interfaceName
     if(err) {
       callback(err);
     } else {
-      //debugIface(iface);
+      debugIface(iface);
 
       var signalKeys = Object.keys(iface.object.signal);
       var methodKeys = Object.keys(iface.object.method);
@@ -262,7 +258,6 @@ var numToDot = function (num) {
   var d = num%256;
   for (var i = 3; i > 0; i--) { 
     num = Math.floor(num/256);
-    //d = num%256 + '.' + d;
     d = d + '.' + num%256;
   }
   return d;

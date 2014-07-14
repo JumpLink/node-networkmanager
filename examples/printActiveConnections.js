@@ -113,7 +113,9 @@ var getActiveConnectionInfo = function (ActiveConnection) {
 networkmanager.connect(function (error, networkmanager) {
 
   networkmanager.NetworkManager.on('StateChanged', function(newState, oldState) {
-    if(typeof oldState == 'undefined' || newState.code != oldState.code) console.log("NetworkManager state changed: "+newState.description);
+    if(typeof oldState == 'undefined' || newState.code != oldState.code) {
+      console.log("NetworkManager state changed: "+newState.description);
+    }
   });
 
   networkmanager.NetworkManager.GetVersion(function(error, Version) {
