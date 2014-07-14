@@ -7,6 +7,8 @@
 
 
 var util = require('util');
+var enums = require('./enumerations');
+var extend = require('node.extend');
 var async = require('async');
 var Netmask = require('netmask').Netmask
 var _debugEvent = require('debug')('event');
@@ -89,8 +91,9 @@ var integrateMethods = function (valueToSet, iface, methodKeys) {
       }
       debug("Call method "+methodKey+" with arguments: ");
       debug(arguments);
-      if(iface.object.method[methodKey].in.length != arguments.length) {
-        warn("Wrong count of arguments!");
+      // + 1 argument for the callback
+      if(iface.object.method[methodKey].in.length + 1 != arguments.length) {
+        warn("Wrong count of arguments! Your count of arguments is "+arguments.length+", but the count should be "+iface.object.method[methodKey].in.length+1);
       }
       switch(arguments.length) {
         case 0:
@@ -132,13 +135,88 @@ var integrateProperties = function (valueToSet, iface, propertyKeys) {
   });
 }
 
+var emitPropertyChanged = function (valueToSet, signalName, interfaceName, splitted, valueKey, newValue, oldValue )  {
+  var newState;
+  if(splitted)
+    debugEvent(signalName+" (PropertyChanged)", interfaceName, newValue, oldValue);
+  else
+    debugEvent(signalName, interfaceName, newValue, oldValue);
+  valueToSet.emit(signalName, newValue, oldValue); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
+  valueToSet[valueKey] = newValue; // save current signal value for next time to know the old value
+}
+
 var integrateSignals = function (valueToSet, iface, signalKeys) {
-  signalKeys.forEach(function(signalKey) {
-    iface.on(signalKey, function(arg1, arg2, arg3, arg4, arg5) {
-      debugEvent(signalKey, arg1, arg2, arg3, arg4, arg5);
-      valueToSet.emit(signalKey, arg1, arg2, arg3, arg4, arg5);
+
+  if(signalKeys.length > 0) {
+    var emitter = new events.EventEmitter();
+    valueToSet = extend(valueToSet, emitter);
+    signalKeys.forEach(function(signalKey) {
+      iface.on(signalKey, function(arg1, arg2, arg3, arg4, arg5) {
+        //debugEvent(signalKey, iface.interfaceName, arg1, arg2, arg3, arg4, arg5);
+        switch(signalKey) {
+          // split each property in the PropertiesChanged event to to a custom event 
+          case 'PropertiesChanged':
+            var splitedSignalKeys = Object.keys(arg1);
+            splitedSignalKeys.forEach(function(signalKey) {
+
+              var signalName = signalKey+"Changed";
+              var splitted = true;
+              var valueKey = signalKey;
+              var newValue = arg1[signalKey];
+              var oldValue = valueToSet[signalKey];
+
+              switch(signalKey) {
+                case 'State':
+                  switch(iface.interfaceName) {
+                    case 'org.freedesktop.NetworkManager':
+                      if (newValue) newValue = enums['NM_STATE'](newValue);
+                    break;
+                    default:
+                    break;
+                  }
+                break;
+                default:
+                break;
+              }
+              emitPropertyChanged(valueToSet, signalName, iface.interfaceName, splitted, valueKey, newValue, oldValue);
+            });
+          break;
+          case 'StateChanged':
+            switch(iface.interfaceName) {
+              case 'org.freedesktop.NetworkManager.Device':
+                // In this case the new value does not need to be stored
+                var signalName = signalKey;
+                var valueKey = 'State';
+                var newState, oldState, reason;
+                if (arg1) newState = enums['NM_DEVICE_STATE'](arg1);
+                if (arg2) oldState = enums['NM_DEVICE_STATE'](arg2);
+                if (arg3) reason = enums['NM_DEVICE_STATE_REASON'](arg3);
+                debugEvent(signalName, iface.interfaceName, newState, oldState, reason);
+                valueToSet.emit(signalName, newState, oldState, reason); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the reason
+              break;
+              case 'org.freedesktop.NetworkManager':
+              default:
+                var signalName = signalKey;
+                var valueKey = 'State';
+                var newState;
+                if (arg1) newState = enums['NM_STATE'](arg1);
+                debugEvent(signalName, iface.interfaceName, newState, valueToSet[valueKey]);
+                valueToSet.emit(signalName, newState, valueToSet[valueKey]); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
+                valueToSet['State'] = newState; // save current signal value for next time to know the old value
+              break;
+            }
+          break;
+          default:
+            var signalName = signalKey;
+            var valueKey = signalKey;
+            debugEvent(signalName, iface.interfaceName, arg1, valueToSet[valueKey], arg2, arg3, arg4, arg5);
+            valueToSet.emit(signalName, arg1, valueToSet[valueKey], arg2, arg3, arg4, arg5); // 1. arg is the signal name, 2. arg is the new value, 3. arg is the old value and the rest
+            valueToSet[valueKey] = arg1; // save current signal value for next time to know the old value
+          break;
+        }
+      });
     });
-  });
+  }
 }
 
 var loadInterface = function (valueToSet, serviceName, objectPath, interfaceName, callback) {
@@ -148,11 +226,11 @@ var loadInterface = function (valueToSet, serviceName, objectPath, interfaceName
     if(err) {
       callback(err);
     } else {
-      debugIface(iface);
+      //debugIface(iface);
 
+      var signalKeys = Object.keys(iface.object.signal);
       var methodKeys = Object.keys(iface.object.method);
       var propertyKeys = Object.keys(iface.object.property); // generate getters for all properties
-      var signalKeys = Object.keys(iface.object.signal);
 
       /* =========== Methods ===========*/
       integrateMethods(valueToSet, iface, methodKeys);
@@ -215,7 +293,7 @@ nm.connect = function (callback) {
   nm.NewNetworkManager = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager';}
-    loadInterface(NetworkManager = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
+    loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (NetworkManager.GetActiveConnections) {
@@ -237,41 +315,7 @@ nm.connect = function (callback) {
           _GetState(function (error, StateCode) {
             if(error) callback(error);
             else {
-              var StateObject = {
-                code: StateCode,
-                name: 'unknown',
-                description: 'Networking state is unknown.'
-              };
-              switch(StateCode) {
-                case 10:
-                  StateObject.name = 'asleep';
-                  StateObject.description = 'Networking is inactive and all devices are disabled.';
-                break;
-                case 20:
-                  StateObject.name = 'disconnected';
-                  StateObject.description = 'There is no active network connection.';
-                break;
-                case 30:
-                  StateObject.name = 'disconnecting';
-                  StateObject.description = 'Network connections are being cleaned up.';
-                break;
-                case 40:
-                  StateObject.name = 'connecting';
-                  StateObject.description = 'A network device is connecting to a network and there is no other available network connection.';
-                break;
-                case 50:
-                  StateObject.name = 'connected_local';
-                  StateObject.description = 'A network device is connected, but there is only link-local connectivity.';
-                break;
-                case 60:
-                  StateObject.name = 'connected_site';
-                  StateObject.description = 'A network device is connected, but there is only site-local connectivity.';
-                break;
-                case 70:
-                  StateObject.name = 'connected_global';
-                  StateObject.description = 'A network device is connected, with global network connectivity.';
-                break;
-              }
+              var StateObject = enums['NM_STATE'](StateCode);
               callback(null, StateObject);
             }
           });
@@ -284,7 +328,7 @@ nm.connect = function (callback) {
 
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
-    loadInterface(AccessPoint = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+    loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
 
       // Overwrite AccessPoint.GetSsid function to get Wireless SSID as strings instead of byte sequences.
       if (AccessPoint.GetSsid) {
@@ -306,7 +350,7 @@ nm.connect = function (callback) {
 
   nm.NewDevice = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device';
-    loadInterface(Device = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (Device.GetIp4Config) {
@@ -333,7 +377,7 @@ nm.connect = function (callback) {
 
   nm.NewIP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP4Config';
-    loadInterface(IP4Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
+    loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
 
       /*
        * Overwrite IP4Config.GetAddresses function to get IP addresses as strings of the form 1.2.3.4 instead of network byte ordered integers.
@@ -360,7 +404,7 @@ nm.connect = function (callback) {
 
   nm.NewIP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
-    loadInterface(IP6Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
+    loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
 
       callback(error, IP6Config);
     });
@@ -368,7 +412,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP4Config';
-    loadInterface(DHCP4Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
+    loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
 
       callback(error, DHCP4Config);
     });
@@ -376,7 +420,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP6Config';
-    loadInterface(DHCP6Config = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
+    loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
 
       callback(error, DHCP6Config);
     });
@@ -385,7 +429,7 @@ nm.connect = function (callback) {
   nm.NewSettings = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager/Settings';}
-    loadInterface(Settings = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, Settings) {
+    loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, function (error, Settings) {
 
       callback(error, Settings);
     });
@@ -393,7 +437,7 @@ nm.connect = function (callback) {
 
   nm.NewSettingsConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
-    loadInterface(SettingsConnection = new events.EventEmitter(), nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
+    loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
 
       callback(error, SettingsConnection);
     });
@@ -401,8 +445,7 @@ nm.connect = function (callback) {
 
   nm.NewActiveConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Connection.Active';
-    var ActiveConnection = new events.EventEmitter();
-    loadInterface(ActiveConnection, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
+    loadInterface(ActiveConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (ActiveConnection.GetSpecificObject) {

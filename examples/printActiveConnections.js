@@ -37,6 +37,12 @@ var getIp6ConfigInfo = function (IP6Config) {
 }
 
 var getDeviceInfo = function (Device) {
+
+  Device.on('StateChanged', function (newState, oldState, reason) {
+    if(newState) console.log("Device state changed: "+newState.description);
+    if(reason) console.log("Device reason: "+reason.description);
+  });
+
   Device.GetIp4Config(function(error, Ip4Config) {
     getIp4ConfigInfo(Ip4Config);
   });
@@ -105,11 +111,16 @@ var getActiveConnectionInfo = function (ActiveConnection) {
 }
 
 networkmanager.connect(function (error, networkmanager) {
+
+  networkmanager.NetworkManager.on('StateChanged', function(newState, oldState) {
+    if(typeof oldState == 'undefined' || newState.code != oldState.code) console.log("NetworkManager state changed: "+newState.description);
+  });
+
   networkmanager.NetworkManager.GetVersion(function(error, Version) {
     console.log("NetworkManager Version: "+Version);
   });
-  networkmanager.NetworkManager.GetState(function(error, State) {
-    inspect(State);
+  networkmanager.NetworkManager.GetState(function(error, state) {
+    console.log(state.description);
   });
   // get all active connections
   networkmanager.NetworkManager.GetActiveConnections(function(error, ActiveConnections) {
