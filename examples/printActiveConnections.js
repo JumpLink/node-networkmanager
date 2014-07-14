@@ -43,8 +43,13 @@ var getDeviceInfo = function (Device) {
     if(reason) console.log("Device reason: "+reason.description);
   });
 
+  Device.GetStateReason(function(error, State, Reason) {
+    console.log(State.description);
+    console.log(Reason.description);
+  });
+
   Device.GetIp4Config(function(error, Ip4Config) {
-    getIp4ConfigInfo(Ip4Config);
+    if(!error && Ip4Config != null) getIp4ConfigInfo(Ip4Config);
   });
 
   Device.GetIp6Config(function(error, Ip6Config) {
@@ -73,7 +78,7 @@ var getDeviceInfo = function (Device) {
 }
 
 var getSettingsConnectionInfo = function (SettingsConnection) {
-  SettingsConnection.GetSettings(function(Settings) {
+  SettingsConnection.GetSettings(function(error, Settings) {
     inspect(Settings);
     if(Settings['802-11-wireless-security']) {
       SettingsConnection.GetSecrets('802-11-wireless-security', function(Secrets) {
@@ -121,9 +126,15 @@ networkmanager.connect(function (error, networkmanager) {
   networkmanager.NetworkManager.GetVersion(function(error, Version) {
     console.log("NetworkManager Version: "+Version);
   });
+
   networkmanager.NetworkManager.GetState(function(error, state) {
     console.log(state.description);
   });
+
+  networkmanager.NetworkManager.GetPrimaryConnection(function(error, PrimaryConnection) {
+    
+  });
+
   // get all active connections
   networkmanager.NetworkManager.GetActiveConnections(function(error, ActiveConnections) {
     console.log("Count of active connections: "+ActiveConnections.length);

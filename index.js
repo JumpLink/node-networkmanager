@@ -90,7 +90,7 @@ var integrateMethods = function (valueToSet, iface, methodKeys) {
       }
       debug("Call method "+methodKey+" with arguments: ");
       debug(arguments);
-      // + 1 argument for the callback
+      // length + 1 argument for the callback
       if(iface.object.method[methodKey].in.length + 1 != arguments.length) {
         warn("Wrong count of arguments! Your count of arguments is "+arguments.length+", but the count should be "+iface.object.method[methodKey].in.length+1);
       }
@@ -254,13 +254,31 @@ var arrayOfBytesToString = function (ArrayOfBytes) {
   return SsidString;
 };
 
-var numToDot = function (num) {
+var toIP = function (num) {
   var d = num%256;
   for (var i = 3; i > 0; i--) { 
     num = Math.floor(num/256);
     d = d + '.' + num%256;
   }
   return d;
+}
+
+// http://jsperf.com/convert-byte-array-to-hex-string
+var toHex = function (byteArrayData) {
+  var ret = "",
+  i = 0,
+  len = byteArrayData.length;
+  while (i < len) {
+    var h = byteArrayData[i].toString(16);
+    if (h.length < 2) {
+      h = "0" + h;
+    }
+    ret += h.toUpperCase();
+    if(i+1 != len)
+      ret += ":";
+    i++;
+  }
+  return ret;
 }
 
 // Addresses is Array of tuples of IPv4 address/prefix/gateway.
@@ -271,8 +289,8 @@ var numToDot = function (num) {
 //   https://github.com/rs/node-netmask
 var AddressTupleToIPBlock = function (AddressTuple) {
   
-  var ip = numToDot(AddressTuple[0]);
-  var gateway = numToDot(AddressTuple[2]);
+  var ip = toIP(AddressTuple[0]);
+  var gateway = toIP(AddressTuple[2]);
   var bitmask = AddressTuple[1];
   var block = new Netmask(ip, bitmask);
   block.ip = ip;
@@ -317,6 +335,30 @@ nm.connect = function (callback) {
         }
       }
 
+      if (NetworkManager.GetPrimaryConnection) {
+        var _GetPrimaryConnection = NetworkManager.GetPrimaryConnection;
+        NetworkManager.GetPrimaryConnection = function (callback) {
+          _GetPrimaryConnection(function (error, PrimaryConnectionPath) {
+            if(error) callback(error);
+            else if (PrimaryConnectionPath == '/') callback(null, null);
+            else nm.NewActiveConnection(PrimaryConnectionPath, callback);
+          });
+        }
+      }
+
+      if (NetworkManager.GetActivatingConnection) {
+        var _GetActivatingConnection = NetworkManager.GetActivatingConnection;
+        NetworkManager.GetActivatingConnection = function (callback) {
+          _GetActivatingConnection(function (error, ActivatingConnectionPath) {
+            if(error) callback(error);
+            else if (ActivatingConnectionPath == '/') callback(null, null);
+            else {
+              nm.NewActiveConnection(ActivatingConnectionPath, callback);
+            }
+          });
+        }
+      }
+
       callback(error, NetworkManager);
     });
   }
@@ -352,7 +394,8 @@ nm.connect = function (callback) {
         var _GetIp4Config = Device.GetIp4Config;
         Device.GetIp4Config = function (callback) {
           _GetIp4Config(function (error, Ip4ConfigPath) {
-            nm.NewIP4Config(Ip4ConfigPath, callback);
+            if(Ip4ConfigPath == "/") callback(error, null);
+            else nm.NewIP4Config(Ip4ConfigPath, callback);
           });
         }
       }
@@ -360,8 +403,23 @@ nm.connect = function (callback) {
         var _GetIp6Config = Device.GetIp6Config;
         Device.GetIp6Config = function (callback) {
           _GetIp6Config(function (error, Ip6ConfigPath) {
-            if(Ip6ConfigPath == "/") callback(null, null)
+            if(Ip6ConfigPath == "/") callback(error, null);
             else nm.NewIP6Config(Ip6ConfigPath, callback);
+          });
+        }
+      }
+      if (Device.GetStateReason) {
+        var _GetStateReason = Device.GetStateReason;
+        Device.GetStateReason = function (callback) {
+          _GetStateReason(function (error, StateReason) {
+            if(error) { callback(error);}
+            else {
+              for (var State in StateReason) break;
+              var Reason = StateReason[State];
+              State = enums['NM_DEVICE_STATE'](parseInt(State));
+              Reason = enums['NM_DEVICE_STATE_REASON'](parseInt(Reason));
+              callback(error, State, Reason);
+            }
           });
         }
       }
@@ -434,6 +492,24 @@ nm.connect = function (callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
     loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
 
+      // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (SettingsConnection.GetSettings) {
+        var _GetSettings = SettingsConnection.GetSettings;
+        SettingsConnection.GetSettings = function (callback) {
+          _GetSettings(function (Settings) {
+            console.log("Settings");
+            console.log(Settings);
+            if(Settings['802-11-wireless']) {
+              Settings['802-11-wireless'].ssid = arrayOfBytesToString(Settings['802-11-wireless'].ssid);
+              Settings['802-11-wireless']['mac-address'] = toHex(Settings['802-11-wireless']['mac-address']);
+            }
+            callback(null, Settings);
+          });
+        }
+        // Alias
+        ActiveConnection.GetAccessPoint = ActiveConnection.GetSpecificObject
+      }
+
       callback(error, SettingsConnection);
     });
   }
@@ -447,7 +523,9 @@ nm.connect = function (callback) {
         var _GetSpecificObject = ActiveConnection.GetSpecificObject;
         ActiveConnection.GetSpecificObject = function (callback) {
           _GetSpecificObject(function (error, AccessPointPath) {
-            nm.NewAccessPoint(AccessPointPath, callback);
+            if(error) callback(error);
+            else if(AccessPointPath == "/") callback(null, null);
+            else nm.NewAccessPoint(AccessPointPath, callback);
           });
         }
         // Alias
@@ -460,7 +538,8 @@ nm.connect = function (callback) {
           _GetDevices(function (error, DevicesPaths) {
             async.map(DevicesPaths,
               function iterator(DevicesPath, callback) {
-                nm.NewDevice(DevicesPath, callback);
+                if(DevicesPath == "/") callback(null, null);
+                else nm.NewDevice(DevicesPath, callback);
               }, callback
             );
           });
@@ -471,7 +550,9 @@ nm.connect = function (callback) {
         var _GetConnection = ActiveConnection.GetConnection;
         ActiveConnection.GetConnection = function (callback) {
           _GetConnection(function (error, SettingsConnectionPath) {
-            nm.NewSettingsConnection(SettingsConnectionPath, callback);
+            if(error) callback(error);
+            else if(SettingsConnectionPath == "/") callback(null, null);
+            else nm.NewSettingsConnection(SettingsConnectionPath, callback);
           });
         }
       }
