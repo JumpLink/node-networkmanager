@@ -264,7 +264,7 @@ var toIP = function (num) {
 }
 
 // http://jsperf.com/convert-byte-array-to-hex-string
-var toHex = function (byteArrayData) {
+var arrayOfBytesToMac = function (byteArrayData) {
   var ret = "",
   i = 0,
   len = byteArrayData.length;
@@ -279,6 +279,28 @@ var toHex = function (byteArrayData) {
     i++;
   }
   return ret;
+}
+
+function ShortIPv6(value) {
+  return value;
+}
+
+var arrayOfBytesToIPv6 = function (byteArrayData) {
+  var ret = "",
+  i = 0,
+  len = byteArrayData.length;
+  while (i < len) {
+    var h = parseInt(byteArrayData[i]).toString(16);
+    if (h.length < 2) {
+      h = "0" + h;
+    }
+    ret += h;
+    if(i%2 != 0 && i+1 != len) { // number odd and not last
+      ret += ":";
+    }
+    i++;
+  }
+  return ShortIPv6(ret);
 }
 
 // Addresses is Array of tuples of IPv4 address/prefix/gateway.
@@ -296,6 +318,15 @@ var AddressTupleToIPBlock = function (AddressTuple) {
   block.ip = ip;
   block.gateway = gateway;
   return block;
+};
+
+var AddressTupleToIPv6Block = function (AddressTuple) {
+  var result = [];
+  for(var address in AddressTuple) {
+    address = address.split(',');
+    result.push(arrayOfBytesToIPv6(address)+"/"+AddressTuple[address]);
+  }
+  return result;
 };
 
 nm.connect = function (callback) {
@@ -459,6 +490,39 @@ nm.connect = function (callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
     loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
 
+      if (IP6Config.GetAddresses) {
+        var _GetAddresses = IP6Config.GetAddresses;
+        IP6Config.GetAddresses = function (callback) {
+          _GetAddresses(function (error, Addresses) {
+            var result = [];
+            if(!error) {
+              for (var i = 0; i < Addresses.length; i++) {
+                var AddressTuple = Addresses[i];
+                var IPv6 = AddressTupleToIPv6Block(AddressTuple);
+                result.push(IPv6);
+              };
+            }
+            callback(error, result);
+          });
+        }
+      }
+
+      if (IP6Config.GetNameservers) {
+        var _GetNameservers = IP6Config.GetNameservers;
+        IP6Config.GetNameservers = function (callback) {
+          _GetNameservers(function (error, Nameservers) {
+            var result = [];
+            if(!error) {
+              for (var i = 0; i < Nameservers.length; i++) {
+                var NameserversIPv6 = arrayOfBytesToIPv6(Nameservers[i]);
+                result.push(NameserversIPv6);
+              };
+            }
+            callback(error, result);
+          });
+        }
+      }
+
       callback(error, IP6Config);
     });
   }
@@ -501,7 +565,7 @@ nm.connect = function (callback) {
             console.log(Settings);
             if(Settings['802-11-wireless']) {
               Settings['802-11-wireless'].ssid = arrayOfBytesToString(Settings['802-11-wireless'].ssid);
-              Settings['802-11-wireless']['mac-address'] = toHex(Settings['802-11-wireless']['mac-address']);
+              Settings['802-11-wireless']['mac-address'] = arrayOfBytesToMac(Settings['802-11-wireless']['mac-address']);
             }
             callback(null, Settings);
           });

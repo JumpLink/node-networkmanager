@@ -13,26 +13,26 @@ var getAccessPointInfo = function (AccessPoint) {
 
 var getIp4ConfigInfo = function (IP4Config) {
   IP4Config.GetDomains(function(error, Domains) {
-    console.log("Domains: "+Domains.toString());
+    console.log("IPv4 Domains: "+Domains.toString());
   });
 
   IP4Config.GetAddresses(function(error, Addresses) {
-    inspect(Addresses);
+    inspect({'IPv4 Addresses': Addresses});
   });
 }
 
 var getIp6ConfigInfo = function (IP6Config) {
   IP6Config.GetRoutes(function(error, Routes) {
-    inspect(Routes);
+    inspect({'IPv6 Routes': Routes});
   });
   IP6Config.GetDomains(function(error, Domains) {
-    inspect(Domains);
+    inspect({'IPv6 Domains': Domains});
   });
   IP6Config.GetNameservers(function(error, Nameservers) {
-    inspect(Nameservers);
+    inspect({'IPv6 Nameservers': Nameservers});
   });
   IP6Config.GetAddresses(function(error, Addresses) {
-    inspect(Addresses);
+    inspect({'IPv6 Addresses': Addresses});
   });
 }
 
