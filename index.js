@@ -412,6 +412,42 @@ nm.connect = function (callback) {
         }
       }
 
+      if (AccessPoint.GetFlags) {
+        var _GetFlags = AccessPoint.GetFlags;
+        AccessPoint.GetFlags = function (callback) {
+          _GetFlags(function(error, Flags) {
+            if(!error) {
+              Flags = enums['NM_802_11_AP_FLAGS'](Flags);
+            }
+            callback(error, Flags);
+          });
+        }
+      }
+
+      if (AccessPoint.GetWpaFlags) {
+        var _GetWpaFlags = AccessPoint.GetWpaFlags;
+        AccessPoint.GetWpaFlags = function (callback) {
+          _GetWpaFlags(function(error, WpaFlags) {
+            if(!error) {
+              WpaFlags = enums['NM_802_11_AP_SEC'](WpaFlags);
+            }
+            callback(error, WpaFlags);
+          });
+        }
+      }
+
+      if (AccessPoint.GetRsnFlags) {
+        var _GetRsnFlags = AccessPoint.GetRsnFlags;
+        AccessPoint.GetRsnFlags = function (callback) {
+          _GetRsnFlags(function(error, RsnFlags) {
+            if(!error) {
+              RsnFlags = enums['NM_802_11_AP_SEC'](RsnFlags);
+            }
+            callback(error, RsnFlags);
+          });
+        }
+      }
+
       callback(error, AccessPoint);
     });
   }
@@ -454,7 +490,186 @@ nm.connect = function (callback) {
           });
         }
       }
+      if (Device.GetCapabilities) {
+        var _GetCapabilities = Device.GetCapabilities;
+        Device.GetCapabilities = function (callback) {
+          _GetCapabilities(function (error, Capabilities) {
+            if(error) { callback(error);}
+            else {
+              Capabilities = enums['NM_DEVICE_CAP'](Capabilities);
+              callback(error, Capabilities);
+            }
+          });
+        }
+      }
+      if (Device.GetDeviceType) {
+        var _GetDeviceType = Device.GetDeviceType;
+        Device.GetDeviceType = function (callback) {
+          _GetDeviceType(function (error, DeviceType) {
+            if(error) { callback(error);}
+            else {
+              DeviceType = enums['NM_DEVICE_TYPE'](DeviceType);
+              callback(error, DeviceType);
+            }
+          });
+        }
+      }
 
+      // Load additional device interface for device type 
+      Device.GetDeviceType(function(error, Type){
+        if(error) callback(error);
+        else {
+          var additionalInterface = null;
+          switch(Type.name) {
+            case 'ETHERNET':
+              additionalInterface = 'NewDeviceWired';
+            break;
+            case 'WIFI':
+              additionalInterface = 'NewDeviceWireless';
+            break;
+            case 'UNUSED1':
+            break;
+            case 'UNUSED2':
+            break;
+            case 'BT':
+              additionalInterface = 'NewDeviceBluetooth';
+            break;
+            case 'OLPC_MESH':
+              additionalInterface = 'NewDeviceOlpcMesh';
+            break;
+            case 'WIMAX':
+              additionalInterface = 'NewDeviceWiMax';
+            break;
+            case 'MODEM':
+              additionalInterface = 'NewDeviceModem';
+            break;
+            case 'INFINIBAND':
+              additionalInterface = 'NewDeviceInfiniband';
+            break;
+            case 'BOND':
+              additionalInterface = 'NewDeviceBond';
+            break;
+            case 'VLAN':
+              additionalInterface = 'NewDeviceVlan';
+            break;
+            case 'ADSL':
+              additionalInterface = 'NewDeviceAdsl';
+            break;
+            case 'BRIDGE':
+              additionalInterface = 'NewDeviceBridge';
+            break;
+          }
+          if(additionalInterface != null) {
+            nm[additionalInterface](objectPath, function (error, AdditionalDevice){
+              Device = extend(Device, AdditionalDevice);
+              callback(error, Device);
+            });
+          } else {
+            callback(error, Device);
+          }
+        }
+      });
+    });
+  }
+
+  nm.NewDeviceWired = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Wired';
+    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWired) {
+      callback(error, DeviceWired);
+    });
+  }
+
+  nm.NewDeviceWireless = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Wireless';
+    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWireless) {
+
+      // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (DeviceWireless.GetAccessPoints) {
+        var _GetAccessPoints = DeviceWireless.GetAccessPoints;
+        DeviceWireless.GetAccessPoints = function (callback) {
+          _GetAccessPoints(function (AccessPointPaths) {
+            async.map(AccessPointPaths,
+              function iterator(AccessPointPath, callback) {
+                nm.NewAccessPoint(AccessPointPath, callback);
+              }, callback
+            );
+          });
+        }
+      }
+
+      if (DeviceWireless.GetWirelessCapabilities) {
+        var _GetWirelessCapabilities = DeviceWireless.GetWirelessCapabilities;
+        DeviceWireless.GetWirelessCapabilities = function (callback) {
+          _GetWirelessCapabilities(function (error, WirelessCapabilities) {
+            WirelessCapabilities = enums['NM_802_11_DEVICE_CAP'](WirelessCapabilities);
+            callback(error, WirelessCapabilities);
+          });
+        }
+      }
+
+      callback(error, DeviceWireless);
+    });
+  }
+
+  nm.NewDeviceBluetooth = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Bluetooth';
+    loadInterface(DeviceBluetooth = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceBluetooth) {
+      callback(error, DeviceBluetooth);
+    });
+  }
+
+  nm.NewDeviceOlpcMesh = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.OlpcMesh';
+    loadInterface(DeviceOlpcMesh = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceOlpcMesh) {
+      callback(error, DeviceOlpcMesh);
+    });
+  }
+
+  nm.NewDeviceWiMax = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.WiMax';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceModem = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Modem';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceInfiniband = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Infiniband';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceBond = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Bond';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceVlan = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Vlan';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceAdsl = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Adsl';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      callback(error, Device);
+    });
+  }
+
+  nm.NewDeviceBridge = function (objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.Device.Bridge';
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
       callback(error, Device);
     });
   }
@@ -561,8 +776,6 @@ nm.connect = function (callback) {
         var _GetSettings = SettingsConnection.GetSettings;
         SettingsConnection.GetSettings = function (callback) {
           _GetSettings(function (Settings) {
-            console.log("Settings");
-            console.log(Settings);
             if(Settings['802-11-wireless']) {
               Settings['802-11-wireless'].ssid = arrayOfBytesToString(Settings['802-11-wireless'].ssid);
               Settings['802-11-wireless']['mac-address'] = arrayOfBytesToMac(Settings['802-11-wireless']['mac-address']);
@@ -586,10 +799,18 @@ nm.connect = function (callback) {
       if (ActiveConnection.GetSpecificObject) {
         var _GetSpecificObject = ActiveConnection.GetSpecificObject;
         ActiveConnection.GetSpecificObject = function (callback) {
-          _GetSpecificObject(function (error, AccessPointPath) {
+          _GetSpecificObject(function (error, SpecificObjectPath) {
             if(error) callback(error);
-            else if(AccessPointPath == "/") callback(null, null);
-            else nm.NewAccessPoint(AccessPointPath, callback);
+            else if(SpecificObjectPath == "/") callback(null, null);
+            else {
+              // if SpecificObjectPath has "AccessPoint" as substring
+              if(SpecificObjectPath.indexOf("AccessPoint") > -1) {
+                nm.NewAccessPoint(SpecificObjectPath, callback);
+              } else {
+                warn('SpecificObjectPath: "'+SpecificObjectPath+'" not yet implemented, please create an issue: https://github.com/JumpLink/node-networkmanager/issues');
+                callback(null, null);
+              }
+            }
           });
         }
         // Alias

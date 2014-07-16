@@ -9,6 +9,24 @@ var getAccessPointInfo = function (AccessPoint) {
   AccessPoint.GetSsid(function(error, SsidString) {
     console.log("SSID: "+SsidString);
   });
+
+  AccessPoint.GetFlags(function(error, Flags) {
+    console.log(Flags.description);
+  });
+
+  AccessPoint.GetWpaFlags(function(error, WpaFlags) {
+    //inspect(WpaFlags);
+    for (var i = 0; i < WpaFlags.values.length; i++) {
+      console.log("WpaFlag: "+WpaFlags.values[i].description);
+    };
+  });
+
+  AccessPoint.GetRsnFlags(function(error, RsnFlags) {
+    //inspect(RsnFlags);
+    for (var i = 0; i < RsnFlags.values.length; i++) {
+      console.log("RsnFlag: "+RsnFlags.values[i].description);
+    };
+  });
 }
 
 var getIp4ConfigInfo = function (IP4Config) {
@@ -41,6 +59,35 @@ var getDeviceInfo = function (Device) {
   Device.on('StateChanged', function (newState, oldState, reason) {
     if(newState) console.log("Device state changed: "+newState.description);
     if(reason) console.log("Device reason: "+reason.description);
+  });
+
+  Device.GetCapabilities(function(error, Capabilities) {
+    console.log(Capabilities.description);
+  });
+
+  Device.GetDeviceType(function(error, DeviceType) {
+    console.log(DeviceType.description);
+    switch(DeviceType.name) {
+      case 'ETHERNET':
+        Device.GetSpeed(function(error, Speed) {
+          console.log("Speed is "+Speed+" Mb/s");
+        });
+      break; 
+      case 'WIFI':
+        Device.GetWirelessCapabilities(function(error, WirelessCapabilities) {
+          for (var i = 0; i < WirelessCapabilities.values.length; i++) {  
+            console.log("WirelessCapabilities: "+WirelessCapabilities.values[i].description);
+          };
+        });
+
+        Device.GetAccessPoints(function(error, AccessPoints) {
+          // Array of visible access points
+          for (var i = 0; i < AccessPoints.length; i++) {  
+            getAccessPointInfo(AccessPoints[i]);
+          };
+        });
+      break; 
+    }
   });
 
   Device.GetStateReason(function(error, State, Reason) {
@@ -90,8 +137,8 @@ var getSettingsConnectionInfo = function (SettingsConnection) {
 
 var getActiveConnectionInfo = function (ActiveConnection) {
 
-  ActiveConnection.GetAccessPoint(function(error, AccessPoint) {
-    getAccessPointInfo(AccessPoint);
+  ActiveConnection.GetSpecificObject(function(error, SpecificObject) {
+    if(SpecificObject != null) getAccessPointInfo(SpecificObject);
   });
 
   ActiveConnection.GetDevices(function(error, Devices) {
@@ -106,12 +153,12 @@ var getActiveConnectionInfo = function (ActiveConnection) {
 
   // check active connection currently owns the default IPv4 route
   ActiveConnection.GetDefault(function(error, hasIPv4) {
-    if(hasIPv4) console.log("use IPv4");
+    if(hasIPv4) console.log("The active connection use IPv4");
   });
 
   // check active connection currently owns the default IPv6 route
   ActiveConnection.GetDefault6(function(error, hasIPv6) {
-    if(hasIPv6) console.log("use IPv6");
+    if(hasIPv6) console.log("The active connection use IPv6");
   });
 }
 
@@ -132,7 +179,7 @@ networkmanager.connect(function (error, networkmanager) {
   });
 
   networkmanager.NetworkManager.GetPrimaryConnection(function(error, PrimaryConnection) {
-    
+    // getActiveConnectionInfo(PrimaryConnection);
   });
 
   // get all active connections

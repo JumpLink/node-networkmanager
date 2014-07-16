@@ -321,4 +321,268 @@ module.exports = {
     }
     return result;
   },
+  'NM_DEVICE_TYPE': function (code) {
+    var result = {
+      code: code,
+      name: 'UNKNOWN',
+      description: 'The device type is unknown.'
+    };
+    switch(code) {
+      case 1:
+        result.name = 'ETHERNET';
+        result.description = 'The device is wired Ethernet device.';
+      break;
+      case 2:
+        result.name = 'WIFI';
+        result.description = 'The device is an 802.11 WiFi device.';
+      break;
+      case 3:
+        result.name = 'UNUSED1';
+        result.description = 'Unused';
+      break;
+      case 4:
+        result.name = 'UNUSED2';
+        result.description = 'Unused';
+      break;
+      case 5:
+        result.name = 'BT';
+        result.description = 'The device is Bluetooth device that provides PAN or DUN capabilities.';
+      break;
+      case 6:
+        result.name = 'OLPC_MESH';
+        result.description = 'The device is an OLPC mesh networking device.';
+      break;
+      case 7:
+        result.name = 'WIMAX';
+        result.description = 'The device is an 802.16e Mobile WiMAX device.';
+      break;
+      case 8:
+        result.name = 'MODEM';
+        result.description = 'The device is a modem supporting one or more of analog telephone, CDMA/EVDO, GSM/UMTS/HSPA, or LTE standards to access a cellular or wireline data network.';
+      break;
+      case 9:
+        result.name = 'INFINIBAND';
+        result.description = 'The device is an IP-capable InfiniBand interface.';
+      break;
+      case 10:
+        result.name = 'BOND';
+        result.description = 'The device is a bond master interface.';
+      break;
+      case 11:
+        result.name = 'VLAN';
+        result.description = 'The device is a VLAN interface.';
+      break;
+      case 12:
+        result.name = 'ADSL';
+        result.description = 'The device is an ADSL device supporting PPPoE and PPPoATM protocols.';
+      break;
+      case 13:
+        result.name = 'BRIDGE';
+        result.description = 'The device is a bridge interface.';
+      break;
+
+    }
+    return result;
+  },
+  'NM_DEVICE_CAP': function (code) {
+    var result = {
+      code: code,
+      name: 'NONE',
+      description: 'Null capability.'
+    };
+    switch(code) {
+      case 1:
+        result.name = 'NM_SUPPORTED';
+        result.description = 'The device is supported by NetworkManager.';
+      break;
+      case 2:
+        result.name = 'CARRIER_DETECT';
+        result.description = 'The device supports carrier detection.';
+      break;
+    }
+    return result;
+  },
+  'NM_802_11_AP_FLAGS': function (code) {
+    var result = {
+      code: code,
+      name: 'NONE',
+      description: 'Null capability - says nothing about the access point.'
+    };
+    switch(code) {
+      case 1:
+        result.name = 'PRIVACY';
+        result.description = 'Access point supports privacy measures.';
+      break;
+    }
+    return result;
+  },
+  'NM_802_11_AP_SEC': function (code) {
+    var values = [];
+    // 0x0
+    if(code == 0) {
+      values = [{
+        code: 0,
+        name: 'NONE',
+        description: 'Null flag.'
+      }];
+    }
+    // 0x1
+    if(code & 1) {
+      values.push({
+        code: 1,
+        name: 'PAIR_WEP40',
+        description: 'Access point supports pairwise 40-bit WEP encryption.'
+      });
+    }
+    // 0x2
+    if(code & 2) {
+      values.push({
+        code: 2,
+        name: 'PAIR_WEP104',
+        description: 'Access point supports pairwise 104-bit WEP encryption.'
+      });
+    }
+    // 0x4
+    if(code & 4) {
+      values.push({
+        code: 4,
+        name: 'PAIR_TKIP',
+        description: 'Access point supports pairwise TKIP encryption.'
+      });
+    }
+    // 0x8
+    if(code & 8) {
+      values.push({
+        code: 8,
+        name: 'PAIR_CCMP',
+        description: 'Access point supports pairwise CCMP encryption.'
+      });
+    }
+    // 0x10
+    if(code & 16) {
+      values.push({
+        code: 16,
+        name: 'GROUP_WEP40',
+        description: 'Access point supports a group 40-bit WEP cipher.'
+      });
+    }
+    // 0x20
+    if(code & 32) {
+      values.push({
+        code: 32,
+        name: 'GROUP_WEP104',
+        description: 'Access point supports a group 104-bit WEP cipher.'
+      });
+    }
+    // 0x40"
+    if(code & 64) {
+      values.push({
+        code: 64,
+        name: 'GROUP_TKIP',
+        description: 'Access point supports a group TKIP cipher.'
+      });
+    }
+    // 0x80
+    if(code & 128) {
+      values.push({
+        code: 128,
+        name: 'GROUP_CCMP',
+        description: 'Access point supports a group CCMP cipher.'
+      });
+    }
+    // 0x100
+    if(code & 256) {
+      values.push({
+        code: 256,
+        name: 'KEY_MGMT_PSK',
+        description: 'Access point supports PSK key management.'
+      });
+    }
+    // 0x200
+    if(code & 512) {
+      values.push({
+        code: 512,
+        name: 'KEY_MGMT_802_1X',
+        description: 'Access point supports 802.1x key management.'
+      });
+    } 
+    return {flags:code, values:values};
+  },
+  'NM_802_11_DEVICE_CAP': function (code) {
+    var values = [];
+    
+
+    if(code == 0) {
+      values = [{
+        code: 0,
+        name: 'NONE',
+        description: 'Null flag.'
+      }];
+    }
+    // 0x1
+    if(code & 1) {
+      values.push({
+        code: 1,
+        name: 'CIPHER_WEP40',
+        description: 'The device supports the 40-bit WEP cipher.'
+      });
+    }
+    // 0x2
+    if(code & 2) {
+      values.push({
+        code: 2,
+        name: 'CIPHER_WEP104',
+        description: 'The device supports the 104-bit WEP cipher.'
+      });
+    }
+    // 0x4
+    if(code & 4) {
+      values.push({
+        code: 4,
+        name: 'CIPHER_TKIP',
+        description: 'The device supports the TKIP cipher.'
+      });
+    }
+    // 0x8
+    if(code & 8) {
+      values.push({
+        code: 8,
+        name: 'CIPHER_CCMP',
+        description: 'The device supports the CCMP cipher.'
+      });
+    }
+    // 0x10
+    if(code & 16) {
+      values.push({
+        code: 16,
+        name: 'WPA',
+        description: 'The device supports the WPA encryption/authentication protocol.'
+      });
+    }
+    // 0x20
+    if(code & 32) {
+      values.push({
+        code: 32,
+        name: 'RSN',
+        description: 'The device supports the RSN encryption/authentication protocol.'
+      });
+    }
+    // 0x40"
+    if(code & 64) {
+      values.push({
+        code: 64,
+        name: 'AP',
+        description: 'The device supports Access Point mode.'
+      });
+    }
+    // 0x80
+    if(code & 128) {
+      values.push({
+        code: 128,
+        name: 'ADHOC',
+        description: 'The device supports Ad-Hoc mode.'
+      });
+    }
+    return {flags:code, values:values};
+  },
 };
