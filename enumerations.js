@@ -37,6 +37,32 @@ module.exports = {
     }
     return result;
   },
+  'NM_ACTIVE_CONNECTION_STATE': function (code) {
+    var result = {
+      code: code,
+      name: 'UNKNOWN',
+      description: 'The active connection is in an unknown state.'
+    };
+    switch(code) {
+      case 1:
+        result.name = 'ACTIVATING';
+        result.description = 'The connection is activating.';
+      break;
+      case 2:
+        result.name = 'ACTIVATED';
+        result.description = 'The connection is activated.';
+      break;
+      case 3:
+        result.name = 'DEACTIVATING';
+        result.description = 'The connection is being torn down and cleaned up.';
+      break;
+      case 4:
+        result.name = 'DEACTIVATED';
+        result.description = 'The connection is no longer active.';
+      break;
+    }
+    return result;
+  },
   'NM_DEVICE_STATE': function (code) {
     var result = {
       code: code,
@@ -381,6 +407,35 @@ module.exports = {
         result.description = 'The device is a bridge interface.';
       break;
 
+    }
+    return result;
+  },
+  // device = "wireless device" || "access point"
+  'NM_802_11_MODE': function (code, device) {
+    var result = {
+      code: code,
+      name: 'UNKNOWN',
+      description: 'Mode is unknown.'
+    };
+    switch(code) {
+      case 1:
+        result.name = 'ADHOC';
+        if(!device) result.description = 'For both devices and access point objects, indicates the object is part of an Ad-Hoc 802.11 network without a central coordinating access point.';
+        else if(device == "wireless device") result.description = 'The wireless device is part of an Ad-Hoc 802.11 network without a central coordinating access point.';
+        else result.description = 'The access point is part of an Ad-Hoc 802.11 network without a central coordinating access point.';
+      break;
+      case 2:
+        result.name = 'INFRA';
+        if(!device) result.description = 'The wireless device or access point is in infrastructure mode. For devices, this indicates the device is an 802.11 client/station. For access point objects, this indicates the object is an access point that provides connectivity to clients.';
+        else if(device == "wireless device") result.description = 'The wireless device is in infrastructure mode, this indicates the device is an 802.11 client/station.';
+        else result.description = 'The access point is in infrastructure mode, this indicates the object is an access point that provides connectivity to clients.';
+      break;
+      case 3:
+        result.name = 'AP';
+        if(!device) result.description = 'The device is an access point/hotspot. Not valid for access point objects themselves.';
+        else if(device == "wireless device") result.description = 'The device is an access point/hotspot.';
+        else result.description = 'This mode is not valid for access points.';
+      break;
     }
     return result;
   },

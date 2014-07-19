@@ -14,6 +14,7 @@ var getAccessPointInfo = function (AccessPoint) {
     console.log(Flags.description);
   });
 
+
   AccessPoint.GetWpaFlags(function(error, WpaFlags) {
     //inspect(WpaFlags);
     for (var i = 0; i < WpaFlags.values.length; i++) {
@@ -26,6 +27,18 @@ var getAccessPointInfo = function (AccessPoint) {
     for (var i = 0; i < RsnFlags.values.length; i++) {
       console.log("RsnFlag: "+RsnFlags.values[i].description);
     };
+  });
+
+  AccessPoint.GetMaxBitrate(function(error, MaxBitrate) {
+    console.log("AccessPoint max bitrate: "+MaxBitrate+" Kb/s");
+  });
+
+  AccessPoint.GetMode(function(error, Mode) {
+    console.log("AccessPoint Mode: "+Mode.description);
+  });
+
+  AccessPoint.GetStrength(function(error, Strength) {
+    console.log("AccessPoint Strength: "+Strength+"%");
   });
 }
 
@@ -85,6 +98,14 @@ var getDeviceInfo = function (Device) {
           for (var i = 0; i < AccessPoints.length; i++) {  
             getAccessPointInfo(AccessPoints[i]);
           };
+        });
+
+        Device.GetBitrate(function(error, Bitrate) {
+          console.log("Wireless Device Bitrate: "+Bitrate+" Kb/s");
+        });
+
+        Device.GetMode(function(error, Mode) {
+          console.log("Wireless Device Mode: "+Mode.description);
         });
       break; 
     }
