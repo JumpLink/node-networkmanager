@@ -11,6 +11,7 @@ var enums = require('./enumerations');
 var extend = require('node.extend');
 var async = require('async');
 var Netmask = require('netmask').Netmask
+var spawn = require('child_process').spawn;
 var _debugEvent = require('debug')('event');
 var debugEvent = function (name, arg1, arg2, arg3, arg4, arg5) {
   if(!arg1) arg1 = '';
@@ -261,6 +262,15 @@ var arrayOfBytesToString = function (ArrayOfBytes) {
   return SsidString;
 };
 
+// undo arrayOfBytesToString
+var stringToArrayOfBytes = function (str) {
+  var bytes = [];
+  for (var i = 0; i < str.length; ++i) {
+      bytes.push(str.charCodeAt(i));
+  }
+  return bytes;
+};
+
 // http://javascript.about.com/library/blipconvert.htm
 var numToIP = function (num) {
   var d = num%256;
@@ -271,6 +281,7 @@ var numToIP = function (num) {
   return d;
 }
 
+// undo numToIP
 var ipToNum = function (dot) {
   var d = dot.split('.');
   return ((((((+d[3])*256)+(+d[2]))*256)+(+d[1]))*256)+(+d[0]);
@@ -293,6 +304,16 @@ var arrayOfBytesToMac = function (byteArrayData) {
     i++;
   }
   return ret;
+}
+
+// undo arrayOfBytesToMac
+function MacToArrayOfBytes(str) { 
+  var result = [];
+  var hexArray = str.split(':');
+  hexArray.forEach(function(hex) {
+    result.push(parseInt(hex, 16));
+  });
+  return result;
 }
 
 function ShortIPv6(value) {
@@ -844,39 +865,61 @@ nm.connect = function (callback) {
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (SettingsConnection.GetSettings) {
+        var transformSettingsForHuman = function (Settings) {
+          if(Settings['802-11-wireless']) {
+            // Settings['802-11-wireless'].ssidBytes = Settings['802-11-wireless'].ssid;
+            if(Settings['802-11-wireless'].ssid instanceof Array)
+              Settings['802-11-wireless'].ssid = arrayOfBytesToString(Settings['802-11-wireless'].ssid);
+            // Settings['802-11-wireless']['mac-address-bytes'] = Settings['802-11-wireless']['mac-address'];
+            if(Settings['802-11-wireless'].ssid instanceof Array)
+              Settings['802-11-wireless']['mac-address'] = arrayOfBytesToMac(Settings['802-11-wireless']['mac-address']);
+          }
+          if(Settings.ipv4) {
+            var addresses = [];
+            for (var i = 0; i < Settings.ipv4.addresses.length; i++) {
+              var AddressTuple = Settings.ipv4.addresses[i];
+              var IPv4 = AddressTupleToIPBlock(AddressTuple);
+              addresses.push(IPv4);
+            };
+            // Settings.ipv4.AddressTuple = Settings.ipv4.addresses;
+            Settings.ipv4.addresses = addresses;
+          }
+          return Settings;
+        }
         var _GetSettings = SettingsConnection.GetSettings;
-        SettingsConnection.GetSettings = function (callback) {
+        SettingsConnection.GetSettings = function (withSecrets, callback) {
           _GetSettings(function (error, Settings) {
             if(error) {
               callback(error);
             } else {
-              if(Settings['802-11-wireless']) {
-                Settings['802-11-wireless'].ssid = arrayOfBytesToString(Settings['802-11-wireless'].ssid);
-                Settings['802-11-wireless']['mac-address'] = arrayOfBytesToMac(Settings['802-11-wireless']['mac-address']);
+              Settings = transformSettingsForHuman(Settings);
+              if(withSecrets) {
+                var hasSecrets = ['802-1x', '802-11-wireless-security', 'cdma', 'gsm', 'pppoe', 'vpn'];
+                hasSecrets.forEach(function(secretKey) {
+                  if(Settings[secretKey]) {
+                    SettingsConnection.GetSecrets(secretKey, function(error, Secrets) {
+                      if(Secrets)
+                        Settings = extend(true, Settings, Secrets);
+                      callback(null, Settings);
+                    });
+                  }
+                });
+              } else {
+                callback(null, Settings);
               }
-              if(Settings.ipv4) {
-                var addresses = [];
-                for (var i = 0; i < Settings.ipv4.addresses.length; i++) {
-                  var AddressTuple = Settings.ipv4.addresses[i];
-                  var IPv4 = AddressTupleToIPBlock(AddressTuple);
-                  addresses.push(IPv4);
-                };
-                Settings.ipv4.AddressTuple = Settings.ipv4.addresses;
-                Settings.ipv4.addresses = addresses;
-              }
-              callback(null, Settings);
             }
           });
         }
       }
 
       if (SettingsConnection.Update) {
-        var _Update = SettingsConnection.Update;
-        SettingsConnection.Update = function (Settings, callback) {
+        var transformSettingsForDBus = function (Settings) {
           if(Settings['802-11-wireless']) {
             // TODO
-            // Settings['802-11-wireless'].ssid = stringToArrayOfBytes(Settings['802-11-wireless'].ssid);
-            // Settings['802-11-wireless']['mac-address'] = MacToArrayOfBytes(Settings['802-11-wireless']['mac-address']);
+            if(typeof Settings['802-11-wireless'].ssid === "string")
+              Settings['802-11-wireless'].ssid = stringToArrayOfBytes(Settings['802-11-wireless'].ssid);
+            if(typeof Settings['802-11-wireless']['mac-address'] === "string")
+              Settings['802-11-wireless']['mac-address'] = MacToArrayOfBytes(Settings['802-11-wireless']['mac-address']);
           }
           if(Settings.ipv4) {
             var addresses = [];
@@ -887,9 +930,39 @@ nm.connect = function (callback) {
             };
             Settings.ipv4.addresses = addresses;
           }
-          //callback(error, Settings);
-          _Update(Settings, function (error) {
-            callback(error, Settings);
+          return Settings;
+        }
+
+        // TODO
+        // var _Update = SettingsConnection.Update;
+        // SettingsConnection.Update = function (Settings, callback) {
+        //   Settings = transformSettingsForDBus(Settings);
+        //   _Update(Settings, function (error) {
+        //     callback(error, Settings);
+        //   });
+        // }
+
+        // WORKAROUND
+        var updateWithPython = function (objectPath, settings, callback) {
+          settingsJsonString = JSON.stringify(settings);
+          var python = spawn('python', [__dirname+'/UpdateSettingsConnection.py', objectPath, settingsJsonString]);
+          python.on('exit', function(code, signal) {
+            callback();
+          });
+          python.stdout.on('data', function (data) {
+            console.log('stdout: ' + data);
+          });
+
+          python.stderr.on('data', function (data) {
+            console.log('stderr: ' + data);
+          });
+        }
+
+        // WORKAROUND
+        SettingsConnection.Update = function (Settings, callback) {
+          Settings = transformSettingsForDBus(Settings);
+          updateWithPython(objectPath, Settings, function() {
+            callback(null, Settings)
           });
         }
       }

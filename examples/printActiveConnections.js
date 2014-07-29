@@ -146,13 +146,22 @@ var getDeviceInfo = function (Device) {
 }
 
 var getSettingsConnectionInfo = function (SettingsConnection) {
-  SettingsConnection.GetSettings(function(error, Settings) {
+  SettingsConnection.GetSettings(withSecrets = true, function(error, Settings) {
     inspect(Settings);
-    if(Settings['802-11-wireless-security']) {
-      SettingsConnection.GetSecrets('802-11-wireless-security', function(Secrets) {
-        inspect(Secrets); // WARNING! This print out your Wireless Key!
-      });
-    }
+
+    // var hasSecrets = ['802-1x', '802-11-wireless-security', 'cdma', 'gsm', 'pppoe', 'vpn'];
+    // hasSecrets.forEach(function(secretKey) {
+    //   if(Settings[secretKey]) {
+    //     console.log("=========== "+secretKey+" ===========");
+    //     SettingsConnection.GetSecrets(secretKey, function(error, Secrets) {
+    //       console.log("=================");
+    //       inspect(error);
+    //       inspect(Secrets); // WARNING! This print out your Wireless Key!
+    //       console.log("=================");
+    //     });
+    //   }
+    // });
+
   });
 }
 
