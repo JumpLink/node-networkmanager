@@ -230,18 +230,18 @@ def parse_settings(settings):
 objectPath = sys.argv[1]
 settings = json.loads(sys.argv[2])
 
-print(settings)
+# print(settings)
 dbus_settings = parse_settings(settings)
-print(dbus_settings)
+# print(dbus_settings)
 
 
 bus = dbus.SystemBus()
 proxy = bus.get_object("org.freedesktop.NetworkManager", objectPath)
 SettingsConnection = dbus.Interface(proxy, "org.freedesktop.NetworkManager.Settings.Connection")
 
-old_settings = SettingsConnection.GetSettings()
-print("\nold settings: ")
-print(old_settings)
+# old_settings = SettingsConnection.GetSettings()
+# print("\nold settings: ")
+# print(old_settings)
 
 # Save all the updated settings back to NetworkManager
 SettingsConnection.Update(dbus_settings)

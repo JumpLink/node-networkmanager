@@ -86,7 +86,7 @@ var integrateMethods = function (valueToSet, iface, methodKeys) {
     valueToSet[methodKey] =  function () {
       var arguments = Array.prototype.slice.call(arguments);
       iface[methodKey]['timeout'] = TIMEOUTDELAY;
-      if(arguments.length >=0) {
+      if(arguments.length >=0 && typeof(arguments[arguments.length-1]) == 'function') {
         var callback = arguments[arguments.length-1]; // last argument is callback
         iface[methodKey]['finish'] = function (result) {
           callback(null, result);
@@ -382,6 +382,8 @@ nm.connect = function (callback) {
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager';}
     loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
 
+      NetworkManager.objectPath = objectPath;
+
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (NetworkManager.GetActiveConnections) {
         var _GetActiveConnections = NetworkManager.GetActiveConnections;
@@ -444,6 +446,8 @@ nm.connect = function (callback) {
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
     loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+
+      AccessPoint.objectPath = objectPath;
 
       // Overwrite AccessPoint.GetSsid function to get Wireless SSID as strings instead of byte sequences.
       if (AccessPoint.GetSsid) {
@@ -512,6 +516,8 @@ nm.connect = function (callback) {
   nm.NewDevice = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+
+      Device.objectPath = objectPath;
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (Device.GetIp4Config) {
@@ -640,6 +646,7 @@ nm.connect = function (callback) {
   nm.NewDeviceWired = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Wired';
     loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWired) {
+      DeviceWired.objectPath = objectPath;
       callback(error, DeviceWired);
     });
   }
@@ -647,6 +654,8 @@ nm.connect = function (callback) {
   nm.NewDeviceWireless = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Wireless';
     loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWireless) {
+
+      DeviceWireless.objectPath = objectPath;
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (DeviceWireless.GetAccessPoints) {
@@ -701,6 +710,7 @@ nm.connect = function (callback) {
   nm.NewDeviceBluetooth = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bluetooth';
     loadInterface(DeviceBluetooth = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceBluetooth) {
+      Device.objectPath = objectPath;
       callback(error, DeviceBluetooth);
     });
   }
@@ -708,6 +718,7 @@ nm.connect = function (callback) {
   nm.NewDeviceOlpcMesh = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.OlpcMesh';
     loadInterface(DeviceOlpcMesh = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceOlpcMesh) {
+      Device.objectPath = objectPath;
       callback(error, DeviceOlpcMesh);
     });
   }
@@ -715,6 +726,7 @@ nm.connect = function (callback) {
   nm.NewDeviceWiMax = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.WiMax';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -722,6 +734,7 @@ nm.connect = function (callback) {
   nm.NewDeviceModem = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Modem';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -729,6 +742,7 @@ nm.connect = function (callback) {
   nm.NewDeviceInfiniband = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Infiniband';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -736,6 +750,7 @@ nm.connect = function (callback) {
   nm.NewDeviceBond = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bond';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -743,6 +758,7 @@ nm.connect = function (callback) {
   nm.NewDeviceVlan = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Vlan';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -750,6 +766,7 @@ nm.connect = function (callback) {
   nm.NewDeviceAdsl = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Adsl';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -757,6 +774,7 @@ nm.connect = function (callback) {
   nm.NewDeviceBridge = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bridge';
     loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+      Device.objectPath = objectPath;
       callback(error, Device);
     });
   }
@@ -764,6 +782,8 @@ nm.connect = function (callback) {
   nm.NewIP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP4Config';
     loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
+
+      IP4Config.objectPath = IP4Config;
 
       /*
        * Overwrite IP4Config.GetAddresses function to get IP addresses as strings of the form 1.2.3.4 instead of network byte ordered integers.
@@ -789,6 +809,23 @@ nm.connect = function (callback) {
           });
         }
       }
+      if (IP4Config.GetNameservers) {
+        var _GetNameservers = IP4Config.GetNameservers;
+        IP4Config.GetNameservers = function (callback) {
+          _GetNameservers(function (error, Nameservers) {
+            var result = [];
+            if(!error) {
+              for (var i = 0; i < Nameservers.length; i++) {
+                debug(Nameservers[i]);
+                var Nameserver = numToIP(Nameservers[i]);
+                result.push(Nameserver);
+              };
+            }
+            callback(error, result);
+          });
+        }
+      }
+
       callback(error, IP4Config);
     });
   }
@@ -796,6 +833,8 @@ nm.connect = function (callback) {
   nm.NewIP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
     loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
+
+      IP6Config.objectPath = objectPath;
 
       if (IP6Config.GetAddresses) {
         var _GetAddresses = IP6Config.GetAddresses;
@@ -838,6 +877,8 @@ nm.connect = function (callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP4Config';
     loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
 
+      DHCP4Config.objectPath = objectPath;
+
       callback(error, DHCP4Config);
     });
   }
@@ -845,6 +886,8 @@ nm.connect = function (callback) {
   nm.NewDHCP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP6Config';
     loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
+
+      DHCP6Config.objectPath = objectPath;
 
       callback(error, DHCP6Config);
     });
@@ -855,6 +898,8 @@ nm.connect = function (callback) {
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager/Settings';}
     loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, function (error, Settings) {
 
+      Settings.objectPath = objectPath;
+
       callback(error, Settings);
     });
   }
@@ -862,6 +907,8 @@ nm.connect = function (callback) {
   nm.NewSettingsConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
     loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
+
+      SettingsConnection.objectPath = objectPath;
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (SettingsConnection.GetSettings) {
@@ -883,6 +930,13 @@ nm.connect = function (callback) {
             };
             // Settings.ipv4.AddressTuple = Settings.ipv4.addresses;
             Settings.ipv4.addresses = addresses;
+
+            var nameservers = [];
+            for (var i = 0; i < Settings.ipv4.dns.length; i++) {
+              var nameserver = numToIP(Settings.ipv4.dns[i]);
+              nameservers.push(nameserver);
+            };
+            Settings.ipv4.dns = nameservers;
           }
           return Settings;
         }
@@ -922,6 +976,7 @@ nm.connect = function (callback) {
               Settings['802-11-wireless']['mac-address'] = MacToArrayOfBytes(Settings['802-11-wireless']['mac-address']);
           }
           if(Settings.ipv4) {
+            // Adresses
             var addresses = [];
             for (var i = 0; i < Settings.ipv4.addresses.length; i++) {
               var IPBlock = Settings.ipv4.addresses[i];
@@ -929,6 +984,14 @@ nm.connect = function (callback) {
               addresses.push(AddressTuple);
             };
             Settings.ipv4.addresses = addresses;
+
+            // Nameservers
+            var nameservers = [];
+            for (var i = 0; i < Settings.ipv4.dns.length; i++) {
+              var nameserver = ipToNum(Settings.ipv4.dns[i]);
+              nameservers.push(nameserver);
+            };
+            Settings.ipv4.dns = nameservers;
           }
           return Settings;
         }
@@ -975,11 +1038,13 @@ nm.connect = function (callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Connection.Active';
     loadInterface(ActiveConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
 
+      ActiveConnection.objectPath = objectPath;
+
       // Overwrite functions that returns an object paths, so it returns the proxy object
       if (ActiveConnection.GetSpecificObject) {
-        var _GetSpecificObject = ActiveConnection.GetSpecificObject;
+        ActiveConnection.GetSpecificObjectPath = ActiveConnection.GetSpecificObject;
         ActiveConnection.GetSpecificObject = function (callback) {
-          _GetSpecificObject(function (error, SpecificObjectPath) {
+          ActiveConnection.GetSpecificObjectPath(function (error, SpecificObjectPath) {
             if(error) callback(error);
             else if(SpecificObjectPath == "/") callback(null, null);
             else {
