@@ -949,14 +949,19 @@ nm.connect = function (callback) {
               Settings = transformSettingsForHuman(Settings);
               if(withSecrets) {
                 var hasSecrets = ['802-1x', '802-11-wireless-security', 'cdma', 'gsm', 'pppoe', 'vpn'];
-                hasSecrets.forEach(function(secretKey) {
+                async.each(hasSecrets, function( secretKey, callback) {
                   if(Settings[secretKey]) {
                     SettingsConnection.GetSecrets(secretKey, function(error, Secrets) {
-                      if(Secrets)
+                      if(!error && Secrets) {
                         Settings = extend(true, Settings, Secrets);
-                      callback(null, Settings);
+                      }
+                      callback(); // ignore errors
                     });
+                  } else {
+                    callback(); // ignore errors
                   }
+                }, function(error){
+                  callback(error, Settings);
                 });
               } else {
                 callback(null, Settings);
