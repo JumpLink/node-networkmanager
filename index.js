@@ -374,6 +374,8 @@ var AddressTupleToIPv6Block = function (AddressTuple) {
 
 nm.connect = function (callback) {
   bus = dbus.getBus('system');
+  bus.interfaces = {}; //clear interface cache with each connect
+  nm.bus = bus;
   nm.serviceName = 'org.freedesktop.NetworkManager';
   nm.objectPath = '/org/freedesktop/NetworkManager';
 
