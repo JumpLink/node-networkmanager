@@ -38,7 +38,7 @@ var events = require('events');
 
 var nm = {};
 var bus;
-var TIMEOUTDELAY = 30000;
+var TIMEOUTDELAY = 10000;
 var INTERVALDELAY = 100;
 
 /*
@@ -1113,8 +1113,8 @@ nm.connect = function (callback) {
 
 
   waitForService(nm.serviceName, TIMEOUTDELAY, INTERVALDELAY, function (error) {
-    if(error) {
-      console.error (error);
+    if (error) {
+      callback(error);
     } else {
       debug("NetworkManager DBus found! :)");
       nm.NewNetworkManager(null, function(error, NetworkManager) {
