@@ -447,6 +447,12 @@ nm.connect = function (callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
     loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
 
+      if (error) {
+        console.error('NewAccessPoint error', objectPath, error, error.stack);
+        callback(error);
+        return;
+      }
+
       AccessPoint.objectPath = objectPath;
 
       // Overwrite AccessPoint.GetSsid function to get Wireless SSID as strings instead of byte sequences.
