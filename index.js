@@ -38,7 +38,7 @@ var events = require('events');
 
 var nm = {};
 var bus;
-var TIMEOUTDELAY = 30000;
+var TIMEOUTDELAY = 10000;
 var INTERVALDELAY = 100;
 
 /*
@@ -374,6 +374,8 @@ var AddressTupleToIPv6Block = function (AddressTuple) {
 
 nm.connect = function (callback) {
   bus = dbus.getBus('system');
+  bus.interfaces = {}; //clear interface cache with each connect
+  nm.bus = bus;
   nm.serviceName = 'org.freedesktop.NetworkManager';
   nm.objectPath = '/org/freedesktop/NetworkManager';
 
@@ -446,6 +448,12 @@ nm.connect = function (callback) {
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
     loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+
+      if (error) {
+        console.error('NewAccessPoint error', objectPath, error, error.stack);
+        callback(error);
+        return;
+      }
 
       AccessPoint.objectPath = objectPath;
 
@@ -1113,8 +1121,8 @@ nm.connect = function (callback) {
 
 
   waitForService(nm.serviceName, TIMEOUTDELAY, INTERVALDELAY, function (error) {
-    if(error) {
-      console.error (error);
+    if (error) {
+      callback(error);
     } else {
       debug("NetworkManager DBus found! :)");
       nm.NewNetworkManager(null, function(error, NetworkManager) {
