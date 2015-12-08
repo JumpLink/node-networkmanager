@@ -376,6 +376,7 @@ nm.connect = function (callback) {
   bus = dbus.getBus('system');
   bus.interfaces = {}; //clear interface cache with each connect
   nm.bus = bus;
+  nm.dbus = dbus;
   nm.serviceName = 'org.freedesktop.NetworkManager';
   nm.objectPath = '/org/freedesktop/NetworkManager';
 
@@ -909,6 +910,17 @@ nm.connect = function (callback) {
       Settings.objectPath = objectPath;
 
       callback(error, Settings);
+    });
+  }
+
+  nm.NewAgentManager = function(objectPath, callback) {
+    var interfaceName = 'org.freedesktop.NetworkManager.AgentManager';
+    if (objectPath == null) {
+      objectPath = '/org/freedesktop/NetworkManager/AgentManager';
+    }
+    loadInterface(AgentManager = {}, nm.serviceName, objectPath, interfaceName, function (error, AgentManager) {
+      AgentManager.objectPath = objectPath;
+      callback(error, AgentManager);
     });
   }
 
