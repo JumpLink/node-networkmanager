@@ -41,6 +41,8 @@ var bus;
 var TIMEOUTDELAY = 10000;
 var INTERVALDELAY = 100;
 
+var iface_cache = {};
+
 /*
  * Wait for dbus service
  */
@@ -222,32 +224,40 @@ var integrateSignals = function (valueToSet, iface, signalKeys) {
   }
 }
 
-var loadInterface = function (valueToSet, serviceName, objectPath, interfaceName, callback) {
-  debug("valueToSet");
-  debug(valueToSet);
-  bus.getInterface(serviceName, objectPath, interfaceName, function(err, iface) {
-    if(err) {
-      callback(err);
-    } else {
-      debugIface(iface);
+var loadInterface = function (valueToSet, serviceName, objectPath, interfaceName, origCallback, createCallback) {
+  var key = [serviceName, objectPath, interfaceName].join(':');
+  if (iface_cache[key]) {
+    origCallback(null, iface_cache[key]);
+  } else {
 
-      var signalKeys = Object.keys(iface.object.signal);
-      var methodKeys = Object.keys(iface.object.method);
-      var propertyKeys = Object.keys(iface.object.property); // generate getters for all properties
-      //if(iface.object.method) console.log(iface.object.method);
+    bus.getInterface(serviceName, objectPath, interfaceName, function(err, iface) {
+      if(err) {
+        origCallback(err, null);
+      } else {
 
-      /* =========== Methods ===========*/
-      integrateMethods(valueToSet, iface, methodKeys);
+        var signalKeys = Object.keys(iface.object.signal);
+        var methodKeys = Object.keys(iface.object.method);
+        var propertyKeys = Object.keys(iface.object.property); // generate getters for all properties
+        //if(iface.object.method) console.log(iface.object.method);
 
-      /* =========== Properties (getter and setter) ===========*/
-      integrateProperties(valueToSet, iface, propertyKeys);
+        /* =========== Methods ===========*/
+        integrateMethods(valueToSet, iface, methodKeys);
 
-      /* =========== Signals ===========*/
-      integrateSignals(valueToSet, iface, signalKeys);
+        /* =========== Properties (getter and setter) ===========*/
+        integrateProperties(valueToSet, iface, propertyKeys);
 
-      callback(null, valueToSet);
-    }
-  });
+        /* =========== Signals ===========*/
+        integrateSignals(valueToSet, iface, signalKeys);
+
+        createCallback(null, valueToSet, function(err, iface) {
+          if (!err) {
+            iface_cache[key] = iface;
+          }
+          origCallback(err, iface);
+        });
+      }
+    });
+  }
 };
 
 nm.disconnect = function (playerName, callback) {
@@ -375,6 +385,7 @@ var AddressTupleToIPv6Block = function (AddressTuple) {
 nm.connect = function (callback) {
   bus = dbus.getBus('system');
   bus.interfaces = {}; //clear interface cache with each connect
+  iface_cache = {};
   nm.bus = bus;
   nm.dbus = dbus;
   nm.serviceName = 'org.freedesktop.NetworkManager';
@@ -383,7 +394,7 @@ nm.connect = function (callback) {
   nm.NewNetworkManager = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager';}
-    loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, function (error, NetworkManager) {
+    loadInterface(NetworkManager = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, NetworkManager, callback) {
 
       NetworkManager.objectPath = objectPath;
 
@@ -448,7 +459,7 @@ nm.connect = function (callback) {
 
   nm.NewAccessPoint = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.AccessPoint';
-    loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, function (error, AccessPoint) {
+    loadInterface(AccessPoint = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, AccessPoint, callback) {
 
       if (error) {
         console.error('NewAccessPoint error', objectPath, error, error.stack);
@@ -524,7 +535,7 @@ nm.connect = function (callback) {
 
   nm.NewDevice = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
 
       Device.objectPath = objectPath;
 
@@ -654,7 +665,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceWired = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Wired';
-    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWired) {
+    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DeviceWired, callback) {
       DeviceWired.objectPath = objectPath;
       callback(error, DeviceWired);
     });
@@ -662,7 +673,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceWireless = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Wireless';
-    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceWireless) {
+    loadInterface(DeviceWired = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DeviceWireless, callback) {
 
       DeviceWireless.objectPath = objectPath;
 
@@ -718,7 +729,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceBluetooth = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bluetooth';
-    loadInterface(DeviceBluetooth = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceBluetooth) {
+    loadInterface(DeviceBluetooth = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DeviceBluetooth, callback) {
       Device.objectPath = objectPath;
       callback(error, DeviceBluetooth);
     });
@@ -726,7 +737,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceOlpcMesh = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.OlpcMesh';
-    loadInterface(DeviceOlpcMesh = {}, nm.serviceName, objectPath, interfaceName, function (error, DeviceOlpcMesh) {
+    loadInterface(DeviceOlpcMesh = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DeviceOlpcMesh, callback) {
       Device.objectPath = objectPath;
       callback(error, DeviceOlpcMesh);
     });
@@ -734,7 +745,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceWiMax = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.WiMax';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -742,7 +753,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceModem = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Modem';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -750,7 +761,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceInfiniband = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Infiniband';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -758,7 +769,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceBond = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bond';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -766,7 +777,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceVlan = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Vlan';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -774,7 +785,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceAdsl = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Adsl';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -782,7 +793,7 @@ nm.connect = function (callback) {
 
   nm.NewDeviceBridge = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Device.Bridge';
-    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, function (error, Device) {
+    loadInterface(Device = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Device, callback) {
       Device.objectPath = objectPath;
       callback(error, Device);
     });
@@ -790,7 +801,7 @@ nm.connect = function (callback) {
 
   nm.NewIP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP4Config';
-    loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP4Config) {
+    loadInterface(IP4Config = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, IP4Config, callback) {
 
       IP4Config.objectPath = IP4Config;
 
@@ -841,7 +852,7 @@ nm.connect = function (callback) {
 
   nm.NewIP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.IP6Config';
-    loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, IP6Config) {
+    loadInterface(IP6Config = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, IP6Config, callback) {
 
       IP6Config.objectPath = objectPath;
 
@@ -884,7 +895,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP4Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP4Config';
-    loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP4Config) {
+    loadInterface(DHCP4Config = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DHCP4Config, callback) {
 
       DHCP4Config.objectPath = objectPath;
 
@@ -894,7 +905,7 @@ nm.connect = function (callback) {
 
   nm.NewDHCP6Config = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.DHCP6Config';
-    loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, function (error, DHCP6Config) {
+    loadInterface(DHCP6Config = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, DHCP6Config, callback) {
 
       DHCP6Config.objectPath = objectPath;
 
@@ -905,7 +916,7 @@ nm.connect = function (callback) {
   nm.NewSettings = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings';
     if(objectPath == null) {objectPath = '/org/freedesktop/NetworkManager/Settings';}
-    loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, function (error, Settings) {
+    loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Settings, callback) {
 
       Settings.objectPath = objectPath;
 
@@ -918,7 +929,7 @@ nm.connect = function (callback) {
     if (objectPath == null) {
       objectPath = '/org/freedesktop/NetworkManager/AgentManager';
     }
-    loadInterface(AgentManager = {}, nm.serviceName, objectPath, interfaceName, function (error, AgentManager) {
+    loadInterface(AgentManager = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, AgentManager, callback) {
       AgentManager.objectPath = objectPath;
       callback(error, AgentManager);
     });
@@ -926,7 +937,7 @@ nm.connect = function (callback) {
 
   nm.NewSettingsConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Settings.Connection';
-    loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, SettingsConnection) {
+    loadInterface(SettingsConnection = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, SettingsConnection, callback) {
 
       SettingsConnection.objectPath = objectPath;
 
@@ -1061,7 +1072,7 @@ nm.connect = function (callback) {
 
   nm.NewActiveConnection = function (objectPath, callback) {
     var interfaceName = 'org.freedesktop.NetworkManager.Connection.Active';
-    loadInterface(ActiveConnection = {}, nm.serviceName, objectPath, interfaceName, function (error, ActiveConnection) {
+    loadInterface(ActiveConnection = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, ActiveConnection, callback) {
 
       ActiveConnection.objectPath = objectPath;
 
