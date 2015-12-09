@@ -122,6 +122,10 @@ var integrateProperties = function (valueToSet, iface, propertyKeys) {
       }
     }
   });
+
+  valueToSet['GetAllProperties'] = function(callback) {
+    return iface.getProperties(callback);
+  }
 }
 
 var emitSignal = function (valueToSet, signalName, interfaceName, splitted, saveOldValue, valueKey, newValue, oldValue, otherValues)  {
@@ -525,6 +529,20 @@ nm.connect = function (callback) {
           _GetMode(function (error, Mode) {
             Mode = enums['NM_802_11_MODE'](Mode, "access point");
             callback(error, Mode);
+          });
+        }
+      }
+
+      if (AccessPoint.GetAllProperties) {
+        var _GetAllProperties = AccessPoint.GetAllProperties;
+        AccessPoint.GetAllProperties = function (callback) {
+          _GetAllProperties(function (error, props) {
+            if (!error) {
+              props.RsnFlags = enums['NM_802_11_AP_SEC'](props.RsnFlags);
+              props.Ssid = arrayOfBytesToString(props.Ssid);
+              props.Mode = enums['NM_802_11_MODE'](props.Mode, "access point");
+            }
+            callback(error, props);
           });
         }
       }
