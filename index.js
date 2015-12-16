@@ -143,6 +143,7 @@ var integrateSignals = function (valueToSet, iface, signalKeys) {
   if(signalKeys.length > 0) {
     var emitter = new events.EventEmitter();
     valueToSet = extend(valueToSet, emitter);
+    iface.removeAllListeners(); //lets just assume that we'll have no more than one instance of any interface
     signalKeys.forEach(function(signalKey) {
       iface.on(signalKey, function() {
 
