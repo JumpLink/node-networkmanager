@@ -387,6 +387,30 @@ var AddressTupleToIPv6Block = function (AddressTuple) {
   return result;
 };
 
+// private helper to wrap dbus function to map dbus object paths to proxy objects
+generateDbusProxyFunction = function(dbusFunc, mapProxyObjectFunc) {
+  var proxyFunc;
+
+  if (dbusFunc) {
+    proxyFunc = function (proxyCallback) {
+
+      dbusFunc(function(error, paths) {
+        if (error) {
+          proxyCallback(error);
+
+        } else {
+          async.map(paths, function(path, mapCallback) {
+            mapProxyObjectFunc(path, mapCallback);
+          }, proxyCallback);
+        }
+      });
+
+    };
+  }
+
+  return proxyFunc;
+}
+
 nm.connect = function (callback) {
   bus = dbus.getBus('system');
   bus.interfaces = {}; //clear interface cache with each connect
@@ -404,6 +428,23 @@ nm.connect = function (callback) {
       NetworkManager.objectPath = objectPath;
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (NetworkManager.GetAllDevices) {
+        NetworkManager.GetAllDevices = generateDbusProxyFunction(NetworkManager.GetAllDevices, nm.NewDevice);
+      }
+
+      if (NetworkManager.AddAndActivateConnection) {
+        var _AddAndActivateConnection = NetworkManager.AddAndActivateConnection;
+        NetworkManager.AddAndActivateConnection = function (connectionOptions, device, connection, callback) {
+          _AddAndActivateConnection(connectionOptions, device.objectPath, connection.objectPath, function (error, NewConnectionPath, ActiveConnection) {
+            if(error) callback(error);
+            else {
+              // TODO proxy args
+              callback(null, NewConnectionPath, ActiveConnection);
+            }
+          });
+        }
+      }
+
       if (NetworkManager.GetActiveConnections) {
         var _GetActiveConnections = NetworkManager.GetActiveConnections;
         NetworkManager.GetActiveConnections = function (callback) {
@@ -697,6 +738,10 @@ nm.connect = function (callback) {
       DeviceWireless.objectPath = objectPath;
 
       // Overwrite functions that returns an object paths, so it returns the proxy object
+      if (DeviceWireless.GetAllAccessPoints) {
+        DeviceWireless.GetAllAccessPoints = generateDbusProxyFunction(DeviceWireless.GetAllAccessPoints, nm.NewAccessPoint);
+      }
+
       if (DeviceWireless.GetAccessPoints) {
         var _GetAccessPoints = DeviceWireless.GetAccessPoints;
         DeviceWireless.GetAccessPoints = function (callback) {
@@ -938,6 +983,10 @@ nm.connect = function (callback) {
     loadInterface(Settings = {}, nm.serviceName, objectPath, interfaceName, callback, function (error, Settings, callback) {
 
       Settings.objectPath = objectPath;
+
+      if (Settings.ListConnections) {
+        Settings.ListConnections = generateDbusProxyFunction(Settings.ListConnections, nm.NewSettingsConnection);
+      }
 
       callback(error, Settings);
     });
