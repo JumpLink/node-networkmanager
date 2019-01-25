@@ -208,7 +208,7 @@ def parse_settings(settings):
 
       for ipv4_key in settings[settings_key]:
         if ipv4_key == 'routes':
-          dbus_ipv4[dbus.String(ipv4_key)] = parse_array_of_uint32(settings[settings_key][ipv4_key])
+          dbus_ipv4[dbus.String(ipv4_key)] = parse_array_of_array_of_uint32(settings[settings_key][ipv4_key])
         elif ipv4_key == 'addresses':
           dbus_ipv4[dbus.String(ipv4_key)] = parse_array_of_array_of_uint32(settings[settings_key][ipv4_key])
         elif ipv4_key == 'dns':
