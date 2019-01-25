@@ -11,7 +11,7 @@
   "dependencies": {
     "async": "^0.9.0",
     "dbus": "^0.2.9",
-    "debug": "^1.0.3",
+    "debug": ">=2.6.9",
     "netmask": "^1.0.4",
     "node.extend": "^1.0.10"
   }
