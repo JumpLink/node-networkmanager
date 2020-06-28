@@ -32,8 +32,7 @@ var debug = function(object) {
     _debug("\n"+util.inspect(object, showHidden=false, depth=2, colorize=true)+"\n");
 };
 var warn = require('debug')('warn');
-var DBus = require('dbus'); 
-var dbus = new DBus();
+var DBus = require('dbus');
 var events = require('events');
 
 var nm = {};
@@ -47,21 +46,20 @@ var iface_cache = {};
  * Wait for dbus service
  */
 waitForService = function (findServiceName, timeoutDelay, intervalDelay, callback) {
-  bus.getInterface('org.freedesktop.DBus', '/', 'org.freedesktop.DBus', function(err, iface) {
+  bus.getInterface('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', function(err, iface) {
     var timeout, interval;
 
     if(err) { return callback(err); } else {
       var checkService = function (callback) {
         debug("looking for dbus service");
-        iface.ListNames['finish'] = function(serviceList) {
+        iface.ListNames(function(err, serviceList) {
           for (index = 0; index < serviceList.length; ++index) {
             if(serviceList[index] === findServiceName) {
               return callback(true);
             }
           }
           return callback(false);
-        }
-        iface.ListNames();
+        });
       }
 
       timeout = setTimeout(function () {
