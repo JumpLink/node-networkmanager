@@ -410,11 +410,11 @@ generateDbusProxyFunction = function(dbusFunc, mapProxyObjectFunc) {
 }
 
 nm.connect = function (callback) {
-  bus = dbus.getBus('system');
+  bus = DBus.getBus('system');
   bus.interfaces = {}; //clear interface cache with each connect
   iface_cache = {};
   nm.bus = bus;
-  nm.dbus = dbus;
+  nm.dbus = DBus;
   nm.serviceName = 'org.freedesktop.NetworkManager';
   nm.objectPath = '/org/freedesktop/NetworkManager';
 
